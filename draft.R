@@ -45,15 +45,72 @@ time_length(time_range, unit="years")
 n_distinct(iowa_liquor_data$invoice_line_no) == nrow(iowa_liquor_data) 
 # No duplicates were found :)
 
+# How many locations are missing?
+sum(is.na(iowa_liquor_data$store_location))
+# Around 2.5M of invoices do not have location
+
+no_location_stores <- iowa_liquor_data %>% 
+  filter(is.na(store_location)) %>% 
+  select(invoice_line_no, date, store, name, zipcode, address) 
+# But the missing data is only from 689 stores
+n_distinct(no_location_stores$store)
+
+# No location stores, who sells more?
+invoices_no_location <- no_location_stores %>% 
+  group_by(name) %>% 
+  summarise(sales=n(),
+            zipcode=first(zipcode),
+            address=first(address),
+            store=first(store),
+            first_sale=min(date),
+            last_sale=max(date)) %>% 
+  arrange(desc(sales))
+
+# Let's fill manually the missing fields by using google maps
+# write_csv(invoices_no_location, 'missing_location_stores.csv')
+
+
+
 
 # mapping zipfiles
+
+# Download shape file
 # https://catalog.data.gov/dataset/tiger-line-shapefile-2019-2010-nation-u-s-2010-census-5-digit-zip-code-tabulation-area-zcta5-na
 # https://stackoverflow.com/questions/70545611/how-to-plot-zipcodes-onto-a-map-of-usa-using-counts-in-r
 
-url <- 'https://data.iowa.gov/resource/m3tr-qhgy.csv?$order=:id&$limit=1000000&$offset=10000'
+# Set timeout to 7 minutes. The shape file we want to download is heavy
+options(timeout=60*7)  
+# Download the file
+# download.file('https://www2.census.gov/geo/tiger/TIGER2019/ZCTA5/tl_2019_us_zcta510.zip',
+#               destfile = 'geo_data/tl_2019_us_zcta510.zip')
+
+# Unzip the downloaded file
+# system('unzip geo_data/tl_2019_us_zcta510.zip -d geo_data/tl_2019_us_zcta510')
+
+# summarise by zip code
+liquor_sales_summary <- iowa_liquor_data %>% 
+  group_by(zipcode) %>% 
+  summarise(n_stores   = n_distinct(store, na.rm = TRUE),
+            n_invoices = n(),
+            n_bottles  = sum(sale_bottles, na.rm = TRUE),
+            liters     = sum(sale_liters, na.rm = TRUE),
+            spent_usd  = sum(sale_dollars, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(zipcode = as.character(zipcode))
+
+# load the zip codes in a simple features table
+iowa_zip_codes <- sf::st_read("geo_data/tl_2019_us_zcta510/tl_2019_us_zcta510.shp")
 
 
+# Put the summary and the zip shape data in a single table
+shape_zip_sumary <- iowa_zip_codes %>%
+  left_join(liquor_sales_summary, by = c("ZCTA5CE10"="zipcode" )) %>% 
+  filter(ZCTA5CE10 %in% liquor_sales_summary$zipcode)
 
+library(sf)
+iowa_map <- map_data("county", "iowa")
+plot(shape_zip_sumary["liters"])
+plot(sf::st_geometry(shape_zip_sumary))
 
 
 
