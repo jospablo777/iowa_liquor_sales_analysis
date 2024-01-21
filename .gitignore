@@ -51,6 +51,7 @@ rsconnect/
 # Heavy data files
 *.csv
 *.feather
+*.shp
 
 # Include this data
 !drinking_holidays.csv
