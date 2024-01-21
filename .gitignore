@@ -49,5 +49,5 @@ po/*~
 rsconnect/
 
 # Heavy data files
-.csv
-.feather
+*.csv
+*.feather
