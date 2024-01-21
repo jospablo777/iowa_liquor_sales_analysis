@@ -48,6 +48,9 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 
+# Our Python virtual environment folder
+r_pycaret/
+
 # Heavy data files
 *.csv
 *.feather
