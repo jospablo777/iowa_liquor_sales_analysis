@@ -51,3 +51,8 @@ rsconnect/
 # Heavy data files
 *.csv
 *.feather
+
+# Include this data
+!drinking_holidays.csv
+!iowa_population.csv
+!missing_location_stores.csv
