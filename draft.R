@@ -1,5 +1,6 @@
 library(tidyverse)
 library(feather)
+library(plotly)
 source('utils/get_data.R')
 
 
@@ -25,6 +26,36 @@ source('utils/get_data.R')
 # Since feather format is faster we will use this to save time when reading
 # the data
 iowa_liquor_data <- read_feather('data/iowa_liquor_data_full.feather')
+
+
+# -----------------------------------------------------------------
+# Extra data
+
+holidays <- read_csv('data/drinking_holidays.csv') %>% 
+  mutate(date = as_date(Date, format = '%d-%B-%Y'))
+
+iowa_population <- read_csv('data/iowa_population.csv') %>% 
+  select(-Source) %>% 
+  mutate(pop_100k=Population/100000)
+
+
+# -----------------------------------------------------------------
+# More variables
+
+# Add the type of spirit/drink
+iowa_liquor_data <- iowa_liquor_data %>% 
+  mutate(liquor_type = case_when(
+    grepl('VODK', category_name)  ~ 'VODKA',
+    grepl('WHISK', category_name)  ~ 'WHISKY',
+    grepl('RUM', category_name)  ~ 'RUM',
+    grepl('SCHN', category_name)  ~ 'SCHNAPPS',
+    grepl('TEQ', category_name)  ~ 'TEQUILA',
+    grepl('BRANDIE', category_name) | grepl('BRANDY', category_name) ~ 'BRANDY',
+    grepl('GIN', category_name)  ~ 'GIN',
+    grepl('MEZC', category_name)  ~ 'MEZCAL',
+    grepl('CREM', category_name) | grepl('CREAM', category_name) ~ 'CREAM',
+    .default = 'OTHER'
+  ))
 
 
 
@@ -69,6 +100,75 @@ invoices_no_location <- no_location_stores %>%
 # Let's fill manually the missing fields by using google maps
 # write_csv(invoices_no_location, 'missing_location_stores.csv')
 
+
+# -----------------------------------------------------------------
+# Exploring time series structure
+consumption_day_summary <- iowa_liquor_data %>% 
+  group_by(day = floor_date(date, unit = "day")) %>% 
+  summarise(n_invoices = n(),
+            n_bottles  = sum(sale_bottles, na.rm = TRUE),
+            liters     = sum(sale_liters, na.rm = TRUE),
+            spent_usd  = sum(sale_dollars, na.rm = TRUE))
+
+consumption_week_summary <- iowa_liquor_data %>% 
+  group_by(week = floor_date(date, unit = "week")) %>% 
+  summarise(n_invoices = n(),
+            n_bottles  = sum(sale_bottles, na.rm = TRUE),
+            liters     = sum(sale_liters, na.rm = TRUE),
+            spent_usd  = sum(sale_dollars, na.rm = TRUE)) %>% 
+  mutate(Year = year(week)) %>% 
+  left_join(iowa_population) %>% 
+  mutate(liters_per_100k=liters/pop_100k,
+         liters_per_capita=liters/Population)
+
+consumption_time_series_plot <- ggplot(consumption_week_summary, aes(x=as.Date(week), y=liters_per_capita)) +
+  geom_line() + 
+  geom_vline(data = holidays %>% filter(Type == 'Health'),
+             aes(xintercept = as.Date(date)),
+             size = 0.5, colour = "red") +
+  xlab("")
+
+consumption_time_series_plot
+ggplotly(consumption_time_series_plot)
+
+
+consumption_month_summary <- iowa_liquor_data %>% 
+  group_by(month = floor_date(date, unit = "month")) %>% 
+  summarise(n_invoices = n(),
+            n_bottles  = sum(sale_bottles, na.rm = TRUE),
+            liters     = sum(sale_liters, na.rm = TRUE),
+            spent_usd  = sum(sale_dollars, na.rm = TRUE)) %>% 
+  mutate(Year = year(month)) %>% 
+  left_join(iowa_population) %>% 
+  mutate(liters_per_100k=liters/pop_100k,
+         liters_per_capita=liters/Population,
+         month_ = as.factor(month(month)),
+         year_ = as.factor(year(month)))
+
+
+
+consumption_time_series_month_plot <- ggplot(consumption_month_summary, aes(x=as.Date(month), y=liters_per_100k, color=as.factor(month_))) +
+  geom_line() + 
+  # geom_vline(data = holidays %>% filter(Type == 'Health'),
+  #            aes(xintercept = as.Date(date)),
+  #            size = 0.5, colour = "red") +
+  xlab("") 
+
+consumption_time_series_month_plot
+ggplotly(consumption_time_series_month_plot)
+
+
+# summarise months
+consumption_month_summary <- iowa_liquor_data %>% 
+  group_by(month = floor_date(date, unit = "month")) %>% 
+  summarise(n_invoices = n(),
+            n_bottles  = sum(sale_bottles, na.rm = TRUE),
+            liters     = sum(sale_liters, na.rm = TRUE),
+            spent_usd  = sum(sale_dollars, na.rm = TRUE)) %>% 
+  mutate(Year = year(month)) %>% 
+  left_join(iowa_population) %>% 
+  mutate(liters_per_100k=liters/pop_100k,
+         liters_per_capita=liters/Population)
 
 
 
