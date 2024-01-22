@@ -1,7 +1,9 @@
 library(tidyverse)
 library(feather)
 library(plotly)
+library(reticulate)
 source('utils/get_data.R')
+source('utils/data_processing.R')
 
 
 
@@ -26,7 +28,6 @@ source('utils/get_data.R')
 # Since feather format is faster we will use this to save time when reading
 # the data
 iowa_liquor_data <- read_feather('data/iowa_liquor_data_full.feather')
-
 
 # -----------------------------------------------------------------
 # Extra data
@@ -57,10 +58,30 @@ iowa_liquor_data <- iowa_liquor_data %>%
     .default = 'OTHER'
   ))
 
+# Add an estimator for the luxury of the spirit
+iowa_liquor_data <- iowa_liquor_data %>% 
+  mutate(expensiveness = sale_dollars / sale_liters)
+
 
 
 # -----------------------------------------------------------------
 # EDA: exploratory data analysis
+
+
+# Some info about the items
+luxury_index <- iowa_liquor_data %>% 
+  group_by(itemno) %>% 
+  summarise(lux=mean(expensiveness),
+            sd=sd(expensiveness),
+            decription=first(im_desc),
+            category_name=first(category_name),
+            total_sold_usd=sum(sale_dollars),
+            total_sold_liters=sum(sale_liters),
+            total_sold_bottles=sum(sale_bottles)) %>% 
+  arrange(desc(lux))
+
+aa <- iowa_liquor_data %>% 
+  filter(im_desc == "BURNETT'S PINK LEMONADE VODKA MINI")
 
 # lets check the range of time of our data
 oldest_entry <- min(iowa_liquor_data$date)
@@ -108,7 +129,31 @@ consumption_day_summary <- iowa_liquor_data %>%
   summarise(n_invoices = n(),
             n_bottles  = sum(sale_bottles, na.rm = TRUE),
             liters     = sum(sale_liters, na.rm = TRUE),
-            spent_usd  = sum(sale_dollars, na.rm = TRUE))
+            spent_usd  = sum(sale_dollars, na.rm = TRUE)) %>% 
+  mutate(Year = year(day)) %>% 
+  left_join(iowa_population) %>% 
+  mutate(liters_per_100k=liters/pop_100k,
+         liters_per_capita=liters/Population,
+         week_day = name_days(day),
+         weekend = is_weekend(day))
+
+consumption_time_series_day_plot <- ggplot(consumption_day_summary, aes(x=as.Date(day), y=n_bottles)) + #check bottles and liters
+  geom_line() + 
+  geom_point(aes(color=as.factor(week_day))) +
+  # geom_vline(data = holidays %>% filter(Type == 'Health'),
+  #            aes(xintercept = as.Date(date)),
+  #            size = 0.5, colour = "red") +
+  xlab("")
+
+consumption_time_series_day_plot
+ggplotly(consumption_time_series_day_plot)
+# Friday, Saturday, and Sundays are the days with the less purchases
+
+# TO DO: in each week, determine the day with best and worst purchases. Then, count all the Mondays, Tuesdays, etc. with best/worst sales
+
+anomaly_check <- iowa_liquor_data %>% 
+  filter(date %in% c(as_date("2023-10-04"), as_date("2023-10-11"))) %>% 
+  arrange(desc(sale_bottles))
 
 consumption_week_summary <- iowa_liquor_data %>% 
   group_by(week = floor_date(date, unit = "week")) %>% 
@@ -121,15 +166,15 @@ consumption_week_summary <- iowa_liquor_data %>%
   mutate(liters_per_100k=liters/pop_100k,
          liters_per_capita=liters/Population)
 
-consumption_time_series_plot <- ggplot(consumption_week_summary, aes(x=as.Date(week), y=liters_per_capita)) +
+consumption_time_series_week_plot <- ggplot(consumption_week_summary, aes(x=as.Date(week), y=liters_per_100k)) +
   geom_line() + 
-  geom_vline(data = holidays %>% filter(Type == 'Health'),
-             aes(xintercept = as.Date(date)),
-             size = 0.5, colour = "red") +
+  # geom_vline(data = holidays %>% filter(Type == 'Health'),
+  #            aes(xintercept = as.Date(date)),
+  #            size = 0.5, colour = "red") +
   xlab("")
 
-consumption_time_series_plot
-ggplotly(consumption_time_series_plot)
+consumption_time_series_week_plot
+ggplotly(consumption_time_series_week_plot)
 
 
 consumption_month_summary <- iowa_liquor_data %>% 
@@ -170,8 +215,13 @@ consumption_month_summary <- iowa_liquor_data %>%
   mutate(liters_per_100k=liters/pop_100k,
          liters_per_capita=liters/Population)
 
+# -----------------------------------------------------------------
+# Anomaly detection in time series
+
+ 
 
 
+# -----------------------------------------------------------------
 # mapping zipfiles
 
 # Download shape file
