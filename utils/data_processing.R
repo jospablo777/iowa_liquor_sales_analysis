@@ -17,5 +17,5 @@ name_days <- function(date_vector){
 
 # A label for weekends
 is_weekend <- function(date_vector) {
-  if_else(wday(date_vector, week_start = 1) %in% c(6,7), 1, 0)
+  if_else(wday(date_vector, week_start = 1) %in% c(5, 6,7), 1, 0)
 }
