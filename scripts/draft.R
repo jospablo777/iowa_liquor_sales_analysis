@@ -137,12 +137,22 @@ consumption_day_summary <- iowa_liquor_data %>%
          week_day = name_days(day),
          weekend = is_weekend(day))
 
-consumption_time_series_day_plot <- ggplot(consumption_day_summary, aes(x=as.Date(day), y=n_bottles)) + #check bottles and liters
+consumption_time_series_day_plot <- 
+  ggplot(consumption_day_summary, aes(x=as.Date(day), y=n_bottles)) + 
+  geom_line() + 
+  xlab("")
+
+consumption_time_series_day_plot
+ggplotly(consumption_time_series_day_plot)
+# It seems that there are a lot of purchases near to zero. Could all
+# the liquor stores agree to not purchase in certain days occasions? 😳
+
+
+# Let's re-check considering the week days in the chart
+consumption_time_series_day_plot <- 
+  ggplot(consumption_day_summary, aes(x=as.Date(day), y=n_bottles)) + 
   geom_line() + 
   geom_point(aes(color=as.factor(week_day))) +
-  # geom_vline(data = holidays %>% filter(Type == 'Health'),
-  #            aes(xintercept = as.Date(date)),
-  #            size = 0.5, colour = "red") +
   xlab("")
 
 consumption_time_series_day_plot
@@ -151,69 +161,6 @@ ggplotly(consumption_time_series_day_plot)
 
 # TO DO: in each week, determine the day with best and worst purchases. Then, count all the Mondays, Tuesdays, etc. with best/worst sales
 
-anomaly_check <- iowa_liquor_data %>% 
-  filter(date %in% c(as_date("2023-10-04"), as_date("2023-10-11"))) %>% 
-  arrange(desc(sale_bottles))
-
-consumption_week_summary <- iowa_liquor_data %>% 
-  group_by(week = floor_date(date, unit = "week")) %>% 
-  summarise(n_invoices = n(),
-            n_bottles  = sum(sale_bottles, na.rm = TRUE),
-            liters     = sum(sale_liters, na.rm = TRUE),
-            spent_usd  = sum(sale_dollars, na.rm = TRUE)) %>% 
-  mutate(Year = year(week)) %>% 
-  left_join(iowa_population) %>% 
-  mutate(liters_per_100k=liters/pop_100k,
-         liters_per_capita=liters/Population)
-
-consumption_time_series_week_plot <- ggplot(consumption_week_summary, aes(x=as.Date(week), y=liters_per_100k)) +
-  geom_line() + 
-  # geom_vline(data = holidays %>% filter(Type == 'Health'),
-  #            aes(xintercept = as.Date(date)),
-  #            size = 0.5, colour = "red") +
-  xlab("")
-
-consumption_time_series_week_plot
-ggplotly(consumption_time_series_week_plot)
-
-
-consumption_month_summary <- iowa_liquor_data %>% 
-  group_by(month = floor_date(date, unit = "month")) %>% 
-  summarise(n_invoices = n(),
-            n_bottles  = sum(sale_bottles, na.rm = TRUE),
-            liters     = sum(sale_liters, na.rm = TRUE),
-            spent_usd  = sum(sale_dollars, na.rm = TRUE)) %>% 
-  mutate(Year = year(month)) %>% 
-  left_join(iowa_population) %>% 
-  mutate(liters_per_100k=liters/pop_100k,
-         liters_per_capita=liters/Population,
-         month_ = as.factor(month(month)),
-         year_ = as.factor(year(month)))
-
-
-
-consumption_time_series_month_plot <- ggplot(consumption_month_summary, aes(x=as.Date(month), y=liters_per_100k, color=as.factor(month_))) +
-  geom_line() + 
-  # geom_vline(data = holidays %>% filter(Type == 'Health'),
-  #            aes(xintercept = as.Date(date)),
-  #            size = 0.5, colour = "red") +
-  xlab("") 
-
-consumption_time_series_month_plot
-ggplotly(consumption_time_series_month_plot)
-
-
-# summarise months
-consumption_month_summary <- iowa_liquor_data %>% 
-  group_by(month = floor_date(date, unit = "month")) %>% 
-  summarise(n_invoices = n(),
-            n_bottles  = sum(sale_bottles, na.rm = TRUE),
-            liters     = sum(sale_liters, na.rm = TRUE),
-            spent_usd  = sum(sale_dollars, na.rm = TRUE)) %>% 
-  mutate(Year = year(month)) %>% 
-  left_join(iowa_population) %>% 
-  mutate(liters_per_100k=liters/pop_100k,
-         liters_per_capita=liters/Population)
 
 # -----------------------------------------------------------------
 # Anomaly detection in time series
@@ -224,7 +171,7 @@ data_iforest <- consumption_day_summary %>%
   select(day, n_bottles, week_day, weekend) %>% 
   mutate(month = month(day, abbr = FALSE, label=TRUE)) # the month will also be a feature
 
-source_python('draft_python.py')
+source_python('scripts/anomaly_detection_iforest.py')
 
 # Retrieve the results from our anomaly detection model
 iforest_results <- py$iforest_results %>% 
@@ -242,6 +189,55 @@ anomalies_plot <- ggplot(iforest_results, aes(x=day, y=n_bottles)) +
 
 anomalies_plot
 ggplotly(anomalies_plot)
+# It seems that most of the anomalies are those near to zero on weekends (Friday,
+# Saturday, and Sunday), this, since more of the businesses are closed on 
+# weekends, hence no purchases there, all good. But wait a second what are those in the 4th 
+# and the 11th of October 2013, those look suspicious. In fact, lets check all 
+# days in which more than 150k bottles were bought
+
+days_more_than_15k_bottles <- iforest_results %>% 
+  filter(n_bottles > 150000)
+
+sum(days_more_than_15k_bottles$Anomaly == 1) / (sum(days_more_than_15k_bottles$Anomaly == 1) + sum(days_more_than_15k_bottles$Anomaly == 0))
+# 55% are anomalies
+
+# Further analysis
+days_more_than_15k_bottles <- days_more_than_15k_bottles %>% 
+  mutate(month_number     = month(day),
+         month_day_number = mday(day),
+         year_day_number  = yday(day))
+
+
+daynumber_by_month <- ggplot(days_more_than_15k_bottles, aes(x=month_day_number, y=month_number)) +
+  geom_point(aes(color=Anomaly)) +
+  xlab("")
+
+daynumber_by_month
+ggplotly(daynumber_by_month)
+
+
+daynumber_by_month_holidays <- holidays %>% 
+  filter(Type %in% c('Holiday', 'TV')) %>% 
+  mutate(month_number = month(date),
+         month_day_number   = mday(date)) %>% 
+  group_by(Event) %>% 
+  summarise(mean_month = mean(month_number),
+            mean_day   = mean(month_day_number))
+
+daynumber_by_month <- ggplot(days_more_than_15k_bottles, aes(x=month_day_number, y=month_number)) +
+  geom_point(aes(color=Anomaly)) +
+  geom_point(data=daynumber_by_month_holidays, aes(x=mean_day, y=mean_month), size=7, color='green', alpha=0.5) +
+  geom_text(data = daynumber_by_month_holidays, nudge_x = 0.25, nudge_y = 0.25, 
+            check_overlap = T, aes(label=Event, x=mean_day, y=mean_month)) +
+  xlab("")
+
+daynumber_by_month
+ggplotly(daynumber_by_month)
+
+
+ggplot(days_more_than_15k_bottles, aes(x=year_day_number)) +
+  geom_density(color="darkblue", fill="lightblue")
+
 
 # -----------------------------------------------------------------
 # mapping zipfiles
