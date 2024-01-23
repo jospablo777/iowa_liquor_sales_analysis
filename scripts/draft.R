@@ -218,8 +218,30 @@ consumption_month_summary <- iowa_liquor_data %>%
 # -----------------------------------------------------------------
 # Anomaly detection in time series
 
- 
+# Prepare data for our isolation forest
+# we will pull this data directly from our python session
+data_iforest <- consumption_day_summary %>% 
+  select(day, n_bottles, week_day, weekend) %>% 
+  mutate(month = month(day, abbr = FALSE, label=TRUE)) # the month will also be a feature
 
+source_python('draft_python.py')
+
+# Retrieve the results from our anomaly detection model
+iforest_results <- py$iforest_results %>% 
+  mutate(Anomaly = as.factor(Anomaly)) # We will use the anomaly as a factor
+
+# We cannot plot the date as a df index
+iforest_results$day <- as.Date(rownames(iforest_results), format = "%Y-%m-%d")
+
+
+# Let's see the results!
+anomalies_plot <- ggplot(iforest_results, aes(x=day, y=n_bottles)) +
+  geom_line() + 
+  geom_point(aes(color=Anomaly)) +
+  xlab("")
+
+anomalies_plot
+ggplotly(anomalies_plot)
 
 # -----------------------------------------------------------------
 # mapping zipfiles
