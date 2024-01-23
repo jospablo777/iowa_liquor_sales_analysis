@@ -1,3 +1,8 @@
+# ============================================================
+# Several functions to process our analysis data
+# ============================================================
+
+# Extract the name od the week day
 name_days <- function(date_vector){
   week_day <- wday(date_vector, week_start = 1)
   case_when(week_day == 1 ~ 'Monday',
@@ -10,6 +15,7 @@ name_days <- function(date_vector){
             .default = 'Uknown')
 }
 
+# A label for weekends
 is_weekend <- function(date_vector) {
   if_else(wday(date_vector, week_start = 1) %in% c(6,7), 1, 0)
 }
