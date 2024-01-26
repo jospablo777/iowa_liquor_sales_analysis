@@ -89,8 +89,6 @@ luxury_index <- iowa_liquor_data %>%
             total_sold_bottles=sum(sale_bottles)) %>% 
   arrange(desc(lux))
 
-aa <- iowa_liquor_data %>% 
-  filter(im_desc == "BURNETT'S PINK LEMONADE VODKA MINI")
 
 # lets check the range of time of our data
 oldest_entry <- min(iowa_liquor_data$date)
@@ -130,6 +128,14 @@ invoices_no_location <- no_location_stores %>%
 # Let's fill manually the missing fields by using google maps
 # write_csv(invoices_no_location, 'missing_location_stores.csv')
 
+# Let's check how many missing values we have per column
+missing_per_column <- colSums(is.na(iowa_liquor_data)) %>% 
+  as.list() %>% 
+  as_tibble() %>% 
+  pivot_longer(all_of(colnames(iowa_liquor_data))) %>% 
+  rename(variable=name, missing=value) %>% 
+  arrange(desc(missing))
+# We have three missing item ids, but the sales fields have no missing values
 
 # -----------------------------------------------------------------
 # Exploring time series structure
@@ -279,14 +285,17 @@ consumption_day_summary %>%
   
 # The above is a lot of information, let's aggregate the info in months 
 # to analize the chart with less granularity
-consumption_day_summary %>% 
+consumption_month_decomposition <- consumption_day_summary %>% 
   select(day, n_bottles) %>% 
   group_by(month=yearmonth(day)) %>%
   summarise(n_bottles=sum(n_bottles)) %>% 
   as_tsibble(index=month) %>%
   model(stl = STL(n_bottles)) %>% 
-  components() %>% 
-  autoplot() %>% ggplotly()
+  components()  
+  
+consumption_month_decomposition %>% 
+  autoplot() %>% 
+  ggplotly()
 # Seasonality is interesting across the year we have three peaks, first in June (the more modest), the one in October, and another in December
 # We observe a trend increasing in alcohol "consumption" or at least in acquisition by the stores,
 # it is improvable that this is due to an increase in the population since it didn' increased that much (show chart).
@@ -314,30 +323,60 @@ iowa_liquor_data %>%
 
 # Citation here: Hyndman and Athanasopoulos (2021). Forecasting: Principles and Practice. https://otexts.com/fpp3/
 
+# We observed a trend of an increase in the sales of bottles across the time. 
+# Could this be an indicator of population growth?
 
+# Lets check the Iowa population , is related to the increasing
+# trend in bottle sales
+ggplot(iowa_population, aes(x=Year, y=Population/1e6)) +
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE)
+# Well... the population has increased in the past 12 years
+
+fit_population_increase <- lm(Population ~ Year, data=iowa_population)
+summary(fit_population_increase)
+# So, on average the population has increased in 11k persons per year
+
+gv_population_increase <- gvlma::gvlma(fit_population_increase)
+summary(gv_population_increase)
+# The model seem to be robust, since it complies with the model assumptions
+
+
+# QUEDE AQUÍ: el análisis de abajo debe de ser ajustado a botellas per capita
+# Probar dejando filtrando los nuevos productos a partir de un punto en el tiempo
+
+# -----------------------------------------------------------------
 # Lets check if the amount of different products available in the market
 # are a good predictor of units sold. Please notice that diversity no only comes
 # in flavors, it also comes with sizes and presentations. Let's say an smaller
 # bottle of the same rum, or an special tequila edition of your favorite brand
 # that includes collective shot glasses
+
+# But  first, now that we know that the population of Iowas have been increasing, and 
+# that it could be a potential confounder when we try to estimate the effect of the
+# diversity of products, we should to take it into account.
 sale_by_diversity <- iowa_liquor_data %>% 
   select(date, itemno, sale_bottles) %>% 
   group_by(month = yearmonth(date)) %>%   # We will explore monthly data in our (available) history
-  summarise(n_different_products = n_distinct(itemno),
-            bottles_sale         = sum(sale_bottles))
-# Better not to use sale_dollars since the inflation will be a confounder. If we wanted to
+  mutate(year = year(month)) %>% 
+  left_join(iowa_population, by=c("year"="Year")) %>% # integrate with Iowa population data
+  mutate(population_millions = Population/1e6, # a variable for the population in Millions
+         bottles_per_million_inhabitants = sale_bottles/population_millions) %>% # sales of bottles per million inhabitants 
+  summarise(n_different_products     = n_distinct(itemno),
+            bottles_sale_per_million = sum(bottles_per_million_inhabitants)) 
+# Better not to use sale_dollars since the inflation will be another confounder. If we want to
 # include dollars, we could adjust for inflation and then remove the effect of this 
 # confounder
 
 
-ggplot(sale_by_diversity, aes(x=n_different_products, y=bottles_sale)) + 
-  geom_point()+
+ggplot(sale_by_diversity, aes(x=n_different_products, y=bottles_sale_per_million)) + 
+  geom_point() +
   geom_smooth(method=lm, se=FALSE)
-# Very nice! It seems that the diversity of products is a good predicto. Now, 
+# Very nice! It seems that the diversity of products is a good predictor. Now, 
 # we can get more numerical info from this if we run a linear model
 
 # Linear model
-fit_sales_by_diversity <- lm(bottles_sale ~ n_different_products, data=sale_by_diversity)
+fit_sales_by_diversity <- lm(bottles_sale_per_million ~ n_different_products, data=sale_by_diversity)
 summary(fit_sales_by_diversity)
 
 
@@ -348,27 +387,31 @@ summary(fit_sales_by_diversity)
 gv_sales_by_diversity <- gvlma::gvlma(fit_sales_by_diversity)
 summary(gv_sales_by_diversity)
 # The only assumption don't met was the Link Function one. This suggest that the 
-# we misspecified the link function, or that we miss an important predictor in 
+# we misspecified the link function, or that we forgot to include an important predictor in 
 # our model. You can check more in Peña and Slate (2006) Global Validation of Linear Model Assumptions.
 # Since the model fulfill the  Skewness, Kurtosis, and Heteroscedasticity assumptions,
 # we will put the link function issue to the side (for now).
 
-# Let's interpret our model
+# Let's make sense of our model
 summary(fit_sales_by_diversity)
-# First, we can observe in the R-squared that the model can explain 70% of our data
+# First, we can observe in the R-squared that the model can explain 67% of our data
 # variability, i.e., the diversity in alcoholic products is a good predictor,
 # over all liquor sale in Iowa.
 # Second, we can observe that the estimate for the variable n_different_products is
-# 890. We interpret this as follows: with the release of each new product in the market,
-# the monthly (alcohol) sales in Iowa will increase in 890 bottles in the State of Iowa
+# 263. We interpret this as follows: with the release of each new product in the market,
+# the monthly (alcohol) sales in Iowa will increase in 263 bottles, per million of inhabitants,
+# in the State of Iowa
 
 # But how to present this information to non-technical people?
 
-# Let's say that youre working for a liquor distributor, and now you're 
-# presenting your findings to the C-level execs. You can say something like "For 
+# Let's say that you're working for a liquor distributor, and now you're 
+# presenting your findings to the C-level execs. First consider that the 
+# expression "will increase in 263 bottles, per million of inhabitants" is too 
+# complex. With that in mind, assuming you are in 2027 and that you know that the 
+# population then is around 3.8M, you can say something like "For 
 # every new product (or new presentation of our old product) we launch in Iowa 
-# we will sell around 900 units monthly" # Notice that we say "around 900" to facilitate the diggestion of the info. Round numbers decrease the cognitive load, are easy to remember, and will be easier to asssimilate them by your audience.
-# Of course it not be that simple, if the product is well liked by the population it will sell
+# we will sell around 1000 (i.e., 263.45*3.8) units monthly" # Notice that we say "around 1000" to facilitate the digestion of the info. Round numbers decrease the cognitive load, are easy to remember, and will be easier to assimilate them by your audience.
+# Of course it is not that simple, if the product is well liked by the population it will sell
 # even more, but if it sucks it wont sell. Also, having more products in the inventory could
 # increase costs in logistics, marketing, and so on.
 
@@ -388,31 +431,31 @@ summary(fit_sales_by_diversity)
 
 # So, lets back to our first model. We will do the same, just with a little difference. 
 # Our variables will be log transformed
-ggplot(sale_by_diversity, aes(x=log(n_different_products), y=log(bottles_sale))) + 
+ggplot(sale_by_diversity, aes(x=log(n_different_products), y=log(bottles_sale_per_million))) + 
   geom_point() +
   geom_smooth(method=lm, se=FALSE)
 # The plot does not seem that different
 
 # Linear model, log transformed variables
-fit_sales_by_diversity_log <- lm(log(bottles_sale) ~ log(n_different_products), data=sale_by_diversity)
+fit_sales_by_diversity_log <- lm(log(bottles_sale_per_million) ~ log(n_different_products), data=sale_by_diversity)
 # Check assumptions
 gv_sales_by_diversity_log <- gvlma::gvlma(fit_sales_by_diversity_log)
 summary(gv_sales_by_diversity_log)
 # Great! Now we fulfill our global stat, so we can say that our inference from
 # this model will be more robust
 
-# Now let's dissect our model
+# Continuing with the model...
 summary(fit_sales_by_diversity_log)
 
-# Still, the model can explain 70% of the variability in the data, but now
+# Still, the model explain 68% of the variability in the data, but now
 # the coefficients are different. One of the advantages of the Log-Log regression
 # (log dependent variable, log predictor) is its intuitive interpretation: for
 # every increase in 1% of X we will have a β% increase (or decrease if β is negative) 
-# in our dependent variable. In this case the estimate for β is 1.02, that mean
-# that if we increase our diversity of products by 1% we will sell 100% more bottles,
+# in our dependent variable. In this case the estimate for β is 0.95, that mean
+# that if we increase our diversity of products by 1% we will sell 95% more bottles,
 # in other words, we duplicate (x2) the amount of bottles sold every time we 
 # diversify in 1% our stock. That's a lot, but again we have to considerate also
-# the cost in logistics, space available in our shelf and cellars, 
+# the cost in logistics, space available in our shelf and cellars, supply chain...
 
 
 
