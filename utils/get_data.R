@@ -72,7 +72,6 @@ download_liquor_data <- function(total_of_rows=28176372, batch_size=1000000) {
 #' # Here we download the Iowa Fire Department Census data set. If you go to the dataset web page (https://data.iowa.gov/Emergency-Management/Iowa-Fire-Department-Census/hv43-6ksq/about_data), you will find that the total number of rows of this data set (to the date, 26-Jan-2024) is 738, so if we want the whole data set it is okay if we set total_of_rows=1000, and batch_size=1000.
 #' download_iowa_data(data_id='hv43-6ksq', folder='data', data_name='fire_department_census', total_of_rows=1000, batch_size=1000)
 download_iowa_data <- function(data_id, folder, data_name, total_of_rows=10000, batch_size=5000) {
-  # to the date, we have a total of 28176372 rows
   
   batch_size_str <- format(batch_size, scientific = F)
   n_iterations   <- ceiling(total_of_rows/batch_size)
@@ -100,10 +99,22 @@ download_iowa_data <- function(data_id, folder, data_name, total_of_rows=10000, 
     # Extract content
     df <- httr::content(request)
     
-    # we will save our data locally to save time
-    file_name <- paste0(folder, '/', data_name, '_', i, '.csv')
-    write_csv(df,file_name)
+    file_final_folder <- paste0(folder, '/', data_name, '/')
+    file_name <- paste0(file_final_folder, data_name, '_', i, '.csv')
     
+    # We will save our data locally to save time when re-reading the data.
+    # But first we must check if the directory for our data exist 
+    if (file.exists(file_final_folder)){
+      write_csv(df,file_name) # just saves the file
+    } else {
+      # Creates the directory
+      dir.create(file.path(file_final_folder))
+      
+      # Saves the file
+      write_csv(df,file_name) 
+    }
+    
+    # Update offset for next batch
     offset <- offset + batch_size
     
     cat(paste0('Batch ', i, ' downloaded, ', n_iterations - i, ' are left. \n'))
@@ -154,6 +165,7 @@ read_liquor_data <- function(folder_path='data') {
 #' # Read the fire_department_census data you downloaded with th download_iowa_data() function. The folder 'data' with the data is located in your R project working directory.
 #' read_iowa_data(folder_path='data', data_name='fire_department_census')
 read_iowa_data <- function(folder_path='data', data_name) {
+  folder_path <- paste0(folder_path, '/', data_name, '/')
   filenames <- list.files(folder_path, 
                           pattern=paste0(data_name, ".*\\.csv$"), # Regex to match data_name_XXX.csv
                           full.names=TRUE)
