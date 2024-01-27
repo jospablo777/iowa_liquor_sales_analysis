@@ -28,17 +28,23 @@ library(viridis) # color palette
 # Please check utils/get_data.R for more details on the data pull.
 # We will do the this only once since from now we will use a local copy of the
 # data for speed issues
-# download_liquor_data() # call once
+# https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data
+# call once
+# download_iowa_data(data_id       = 'm3tr-qhgy', 
+#                    folder        = 'data', 
+#                    data_name     = 'iowa_liquor_data', 
+#                    total_of_rows = 29000000, # To the date, we have 28,176,372 rows in this data set
+#                    batch_size    = 1000000)
 
 # Read locally saved data
-# iowa_liquor_data <- read_liquor_data(folder_path = 'data') # call once
+# iowa_liquor_data <- read_iowa_data(folder_path='data', data_name='iowa_liquor_data') # call once
 
-# Save the data in a memory friendly (binary) format
-# write_feather(iowa_liquor_data, 'data/iowa_liquor_data_full.feather') # save once
+# Save the data in a memory friendly (binary) format. Load this file will be much faster.
+# write_feather(iowa_liquor_data, 'data/iowa_liquor_data/iowa_liquor_data_full.feather') # save once
 
 # Since feather format is faster we will use this to save time when reading
 # the data
-iowa_liquor_data <- read_feather('data/iowa_liquor_data_full.feather')
+iowa_liquor_data <- read_feather('data/iowa_liquor_data/iowa_liquor_data_full.feather')
 
 # -----------------------------------------------------------------
 # Extra data
@@ -56,18 +62,20 @@ iowa_population <- read_csv('data/iowa_population.csv') %>%
 
 # Add the type of spirit/drink
 iowa_liquor_data <- iowa_liquor_data %>% 
-  mutate(liquor_type = case_when(
-    grepl('VODK', category_name)  ~ 'VODKA',
-    grepl('WHISK', category_name)  ~ 'WHISKY',
-    grepl('RUM', category_name)  ~ 'RUM',
-    grepl('SCHN', category_name)  ~ 'SCHNAPPS',
-    grepl('TEQ', category_name)  ~ 'TEQUILA',
-    grepl('BRANDIE', category_name) | grepl('BRANDY', category_name) ~ 'BRANDY',
-    grepl('GIN', category_name)  ~ 'GIN',
-    grepl('MEZC', category_name)  ~ 'MEZCAL',
-    grepl('CREM', category_name) | grepl('CREAM', category_name) ~ 'CREAM',
-    .default = 'OTHER'
-  ))
+  mutate(
+    liquor_type = case_when(
+      grepl('VODK', category_name)  ~ 'VODKA',
+      grepl('WHISK', category_name)  ~ 'WHISKY',
+      grepl('RUM', category_name)  ~ 'RUM',
+      grepl('SCHN', category_name)  ~ 'SCHNAPPS',
+      grepl('TEQ', category_name)  ~ 'TEQUILA',
+      grepl('BRANDIE', category_name) | grepl('BRANDY', category_name) ~ 'BRANDY',
+      grepl('GIN', category_name)  ~ 'GIN',
+      grepl('MEZC', category_name)  ~ 'MEZCAL',
+      grepl('CREM', category_name) | grepl('CREAM', category_name) ~ 'CREAM',
+      .default = 'OTHER'
+      )
+    )
 
 # Add an estimator for the luxury of the spirit
 iowa_liquor_data <- iowa_liquor_data %>% 
@@ -624,7 +632,7 @@ download_iowa_data(data_id       = 'gwf2-9cqx',      # Taken from the data set u
 
 # Now we read the data we just downloaded
 iowa_zip_codes <- read_iowa_data(folder_path = 'data', data_name = 'iowa_zip_codes') %>% 
-  filter(state_abbrev == 'IA') %>%  # Filter only the zip codes of Iowa
+  filter(state_abbrev == 'IA') %>%  # Filter only the zip codes of Iowa since the data contains also zip codes outside Iowa
   select(-point_geom) %>%  # for now, we don't need the centroid of the zip area
   mutate(zcta_code = as.character(zcta_code)) %>% 
   st_as_sf(wkt='the_geom') # We indicate the column with the geometries
@@ -653,6 +661,14 @@ first_map <- iowa_zip_codes_ %>%
   theme_bw()  
 
 ggplotly(first_map)
+# Now we can appreciate that we do not have data for every zip code
+
+# In total we have missing data for
+sum(!iowa_zip_codes$zcta_code %in% liquor_sales_summary_by_zip$zipcode)
+# zip codes in our Iowa liquor data
+
+# Besides the missing data, we can can observe that
+
 
 # Now let's see if this matches with the most populated cities in Iowa. Lucky us
 # we can download another data set from the Iowa Open Data portal
@@ -671,28 +687,19 @@ iowa_cities_population <- read_iowa_data(folder_path ='data', data_name='iowa_ci
 
 iowa_most_populated_cities <- iowa_cities_population %>% 
   arrange(desc(population)) %>% # Arrange, most populated first 
-  head(30) # Keeps only the most populated 30
+  head(20) # Keeps only the most populated 50
+# the size of the dot reflects the population size of the city
   
 
-first_map + geom_sf(data=iowa_most_populated_cities,aes(size=population/1000), color='red')
+first_map + 
+  geom_sf(data=iowa_most_populated_cities,aes(size=population/1000), color='#8a0303') 
 # Seems legit. The most populated cities in Iowa are the ones with the most liquor stores
 
 # Now lets check if there is a relation of the "empty" zip code areas with the low population there
 iowa_less_populated_cities <- iowa_cities_population %>% 
   arrange(population) %>% # Arrange, less populated first 
-  head(200) # Check just 200 cities. Remember that we have arpund 500 zip codes with no data
+  head(500) # Check just 500 cities. Remember that we have around 570 zip codes with no data
 
-first_map + geom_sf(data=iowa_less_populated_cities, aes(), color='red')
-
-
-# Now we can appreciate that we do not have data for every zip code
-
-# In total we have missing data for
-sum(!iowa_zip_codes$zcta_code %in% liquor_sales_summary_by_zip$zipcode)
-# zip codes in our Iowa liquor data
-
-# Besides the missing data, we can can observe that
+first_map + geom_sf(data=iowa_less_populated_cities, aes(), color='#8a0303')
 
 
-
-file.exists('data', 'iowa_cities_pop')
