@@ -14,7 +14,9 @@ library(fabletools)
 library(modeltime)
 library(timetk)  
 
-
+# Geospatial libraries
+library(sf)
+library(viridis) # color palette
 
 # -----------------------------------------------------------------
 # Get the data, and some performance considerations
@@ -458,7 +460,145 @@ summary(fit_sales_by_diversity_log)
 # the cost in logistics, space available in our shelf and cellars, supply chain...
 
 
+# -----------------------------------------------------------------
+# Now, let's move to a question that to this data science project
+# Did de COVID-19 pandemic increased the alcohol consumption of the population?
 
+
+# There is a great wiki page that summarises all the history line of covid in Iowa. This is a great resource!
+# https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa
+
+# Lets create a small table to record the first pandemic important events
+events_date  <- c("2020-03-08",
+                  "2020-03-09",
+                  "2020-04-02")
+events_covid <- c("First cases announcement",
+                  "Proclamation of Disaster Emergency",
+                  "Order: schools to remain closed through the end of April")
+
+iowa_first_covid_events <- tibble(Event=events_covid, Date=events_date) %>% 
+  mutate(Date = as_date(Date, format = "%Y-%m-%d"))
+
+# We will modify a little bit our products diversity to take into also account all the new products
+
+# First, let's get a vector with all the items available before "2020-04-02"
+items_prepandemic <- iowa_liquor_data %>% 
+  filter(date < max(iowa_first_covid_events$Date)) %>% 
+  dplyr::pull(itemno) %>% 
+  unique()
+
+# Then, lets filter our data to exclude any receipt who includes any postpandemic item,
+# after that, we can do a montly aggregation of our time serie
+sales_in_covid_times <- iowa_liquor_data %>% 
+  select(date, itemno, sale_bottles) %>% 
+  filter(itemno %in% items_prepandemic) %>% # only prepandemic items
+  group_by(month = yearmonth(date)) %>%   # We will explore monthly data in our (available) history
+  mutate(year = year(month)) %>% 
+  left_join(iowa_population, by=c("year"="Year")) %>% # integrate with Iowa population data
+  mutate(population_millions = Population/1e6, # a variable for the population in Millions
+         bottles_per_million_inhabitants = sale_bottles/population_millions) %>% # sales of bottles per million inhabitants 
+  summarise(n_different_products     = n_distinct(itemno),
+            bottles_sale_per_million = sum(bottles_per_million_inhabitants)) 
+
+# Plot our time series
+ggplot(sales_in_covid_times, aes(x=month, y=bottles_sale_per_million)) +
+  geom_line() + 
+  xlab("")
+
+
+# Let's get a little more detailed with our chart and decompose as we did before
+sales_in_covid_times %>% 
+  as_tsibble(index=month) %>%
+  model(stl = STL(bottles_sale_per_million)) %>% 
+  components() %>% 
+  autoplot() %>% 
+  ggplotly()
+
+# Let's check the peak of sales after the adjustment
+sales_in_covid_times %>% 
+  filter(bottles_sale_per_million == max(bottles_sale_per_million))
+
+
+# Now you must be thinking "Hey, as new products appear, also old ones disappear. The same year you restricted the emergence of new products, we observe a decrease in sales."
+# And you're right, let's put the restriction in new products much before the pandemic and then render a new trend chart
+
+# Vector with only the items available several years before pandemic
+items_restriction_before_pandemic <- iowa_liquor_data %>% 
+  filter(date < as.Date("2016-01-01")) %>%  # We have chosen the start of 2016. More than four years appart from the pandemic
+  dplyr::pull(itemno) %>% 
+  unique()
+
+# Generate time series data set
+sales_precovid_times <- iowa_liquor_data %>% 
+  select(date, itemno, sale_bottles) %>% 
+  filter(itemno %in% items_restriction_before_pandemic) %>% # only prepandemic items
+  group_by(month = yearmonth(date)) %>%   
+  mutate(year = year(month)) %>% 
+  left_join(iowa_population, by=c("year"="Year")) %>% # integrate with Iowa population data
+  mutate(population_millions = Population/1e6, # a variable for the population in Millions
+         bottles_per_million_inhabitants = sale_bottles/population_millions) %>% # sales of bottles per million inhabitants 
+  summarise(n_different_products     = n_distinct(itemno),
+            bottles_sale_per_million = sum(bottles_per_million_inhabitants)) 
+
+# Plot our time series
+ggplot(sales_precovid_times, aes(x=month, y=bottles_sale_per_million)) +
+  geom_line() + 
+  xlab("")
+
+
+# Let's get a little more detailed with our chart and decompose as we did before
+sales_precovid_times %>% 
+  as_tsibble(index=month) %>%
+  model(stl = STL(bottles_sale_per_million)) %>% 
+  components() %>% 
+  autoplot() %>% 
+  ggplotly()
+# Please notice that the trend is almost the same
+
+# Let's see which now the peak of alcohol purchases
+sales_precovid_times %>% 
+  filter(bottles_sale_per_million == max(bottles_sale_per_million))
+# And there you have it! It is still Dec 2020.
+# So we can rule out hte hypothesis of the decrease in sales due to the exclusion 
+# of new products while the old ones were drop into the oblivion. If a product is good and sells well, it should remain into the market
+
+
+# Now back to our sales_in_covid_times dataset.
+
+sales_in_covid_times <- sales_in_covid_times %>% 
+  mutate(year = as.factor(year(month)),
+         month_number = as.factor(month(month))) # we will add this variable to help us to distinguis between years 
+
+sales_in_covid_times_byyear_plot <- sales_in_covid_times %>% 
+  ggplot(aes(x=year, y=bottles_sale_per_million, color=month_number)) + 
+  geom_point()+
+  geom_smooth(method=lm, se=FALSE)
+
+sales_in_covid_times_byyear_plot
+ggplotly(sales_in_covid_times_byyear_plot)
+
+fit_sales_across_years <- lm(bottles_sale_per_million ~ month + year, data=sales_in_covid_times)
+summary(fit_sales_across_years)
+
+gv_sales_across_years <- gvlma::gvlma(fit_sales_across_years)
+summary(gv_sales_across_years)
+
+across_years_coeffs_ <- fit_sales_across_years$coefficients %>% 
+  as.list() %>% 
+  as_tibble()
+across_years_coeffs <- across_years_coeffs_ %>% 
+  pivot_longer(cols=all_of(colnames(across_years_coeffs_))) %>% 
+  rename(coef=name, estimate=value)
+
+across_years_coeffs %>% 
+  arrange(desc(estimate))
+
+sales_in_covid_times %>% 
+  ggplot(aes(x=year, y=bottles_sale_per_million)) + 
+  geom_point()+
+  geom_smooth(method=lm, se=FALSE) +
+  facet_grid(month_number ~ .)
+  
 # -----------------------------------------------------------------
 # Some forecasting for 2024
 # This will be good to know in which days will be better to replenish the stores
@@ -468,23 +608,29 @@ summary(fit_sales_by_diversity_log)
 
 
 # -----------------------------------------------------------------
-# mapping zipfiles
+# mapping zip codes
 
-# Download shape file
-# https://catalog.data.gov/dataset/tiger-line-shapefile-2019-2010-nation-u-s-2010-census-5-digit-zip-code-tabulation-area-zcta5-na
-# https://stackoverflow.com/questions/70545611/how-to-plot-zipcodes-onto-a-map-of-usa-using-counts-in-r
+# Iowa open data portal offers the data of the zip codes
 
-# Set timeout to 7 minutes. The shape file we want to download is heavy
-options(timeout=60*7)  
-# Download the file
-# download.file('https://www2.census.gov/geo/tiger/TIGER2019/ZCTA5/tl_2019_us_zcta510.zip',
-#               destfile = 'geo_data/tl_2019_us_zcta510.zip')
+# Download Iowa zip codes
+# data_id, folder, data_name, total_of_rows=10000, batch_size=5000
+download_iowa_data(data_id       = 'gwf2-9cqx',      # Taken from the data set url 
+                   folder        = 'data',           # Folder name
+                   data_name     = 'iowa_zip_codes', # Name of the files
+                   total_of_rows = 4000,             # We checked in the web site that the row number was 3,910
+                   batch_size    = 4000)
 
-# Unzip the downloaded file
-# system('unzip geo_data/tl_2019_us_zcta510.zip -d geo_data/tl_2019_us_zcta510')
 
-# summarise by zip code
-liquor_sales_summary <- iowa_liquor_data %>% 
+# Now we read the data we just downloaded
+iowa_zip_codes <- read_iowa_data(folder_path = 'data', data_name = 'iowa_zip_codes') %>% 
+  filter(state_abbrev == 'IA') %>%  # Filter only the zip codes of Iowa
+  select(-point_geom) %>%  # for now, we don't need the centroid of the zip area
+  mutate(zcta_code = as.character(zcta_code)) %>% 
+  st_as_sf(wkt='the_geom') # We indicate the column with the geometries
+
+# We must integrate our liquor data to the data we just downloaded to get most of
+# its value. First, we summarise by zip code
+liquor_sales_summary_by_zip <- iowa_liquor_data %>% 
   group_by(zipcode) %>% 
   summarise(n_stores   = n_distinct(store, na.rm = TRUE),
             n_invoices = n(),
@@ -494,19 +640,25 @@ liquor_sales_summary <- iowa_liquor_data %>%
   ungroup() %>% 
   mutate(zipcode = as.character(zipcode))
 
-# load the zip codes in a simple features table
-iowa_zip_codes <- sf::st_read("geo_data/tl_2019_us_zcta510/tl_2019_us_zcta510.shp")
+# Now we integrate our liquor sales data with the map we just downloaded
+iowa_zip_codes_ <- iowa_zip_codes %>% 
+  left_join(liquor_sales_summary_by_zip, by=c("zcta_code"="zipcode"))
 
+# First visualization
+first_map <- iowa_zip_codes_ %>% 
+  ggplot(aes(fill=n_stores)) + 
+  geom_sf() +
+  scale_fill_viridis() + 
+  theme_bw()  
 
-# Put the summary and the zip shape data in a single table
-shape_zip_sumary <- iowa_zip_codes %>%
-  left_join(liquor_sales_summary, by = c("ZCTA5CE10"="zipcode" )) %>% 
-  filter(ZCTA5CE10 %in% liquor_sales_summary$zipcode)
+ggplotly(first_map)
 
-library(sf)
-iowa_map <- map_data("county", "iowa")
-plot(shape_zip_sumary["liters"])
-plot(sf::st_geometry(shape_zip_sumary))
+# Now we can appreciate that we do not have data for every zip code
+
+# In total we have missing data for
+sum(!iowa_zip_codes$zcta_code %in% liquor_sales_summary_by_zip$zipcode)
+# zip codes in our Iowa liquor data
+
 
 
 
