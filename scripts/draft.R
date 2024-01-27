@@ -614,6 +614,7 @@ sales_in_covid_times %>%
 
 # Download Iowa zip codes
 # data_id, folder, data_name, total_of_rows=10000, batch_size=5000
+# https://data.iowa.gov/dataset/Iowa-Regional-Zip-Codes/gwf2-9cqx/about_data
 download_iowa_data(data_id       = 'gwf2-9cqx',      # Taken from the data set url 
                    folder        = 'data',           # Folder name
                    data_name     = 'iowa_zip_codes', # Name of the files
@@ -653,12 +654,30 @@ first_map <- iowa_zip_codes_ %>%
 
 ggplotly(first_map)
 
+# Now let's see if this matches with the most populated cities in Iowa. For this
+# we can download another data set from the Iowa Open Data portal
+# https://data.iowa.gov/Community-Demographics/Total-City-Population-by-Year/acem-thbp/about_data
+download_iowa_data(data_id       = 'acem-thbp',      # Taken from the data set url 
+                   folder        = 'data',           # Folder name
+                   data_name     = 'iowa_cities_pop', # Name of the files
+                   total_of_rows = 40000,            # We checked in the web site that the row number was little more than 31k
+                   batch_size    = 40000)
+
+iowa_cities_population <- read_iowa_data(folder_path ='data', data_name='iowa_cities_pop')
+
+first_map + 
+  geom_point(
+  aes(color = SID74, size = AREA, geometry = geometry),
+  stat = "sf_coordinates") 
+
 # Now we can appreciate that we do not have data for every zip code
 
 # In total we have missing data for
 sum(!iowa_zip_codes$zcta_code %in% liquor_sales_summary_by_zip$zipcode)
 # zip codes in our Iowa liquor data
 
+# Besides the missing data, we can can observe that
 
 
 
+file.exists('data', 'iowa_cities_pop')
