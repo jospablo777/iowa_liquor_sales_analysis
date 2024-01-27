@@ -801,8 +801,6 @@ first_map + geom_sf(data=iowa_less_populated_cities, aes(), color='#8a0303')
 
 # -----------------------------------------------------------------
 # Check how many points fell into the gray area
-# QUEDE ACA
-
 
 # First let's isolate the gray area
 zip_codes_with_no_recorded_zip_codes <- iowa_zip_codes %>% 
@@ -814,3 +812,9 @@ points_within_gray_area <- st_within(iowa_less_populated_cities_points, zip_code
 as.data.frame(points_within_gray_area)
 
 aa <- st_intersection(iowa_less_populated_cities_points, zip_codes_with_no_recorded_zip_codes)
+
+
+# -----------------------------------------------------------------
+# [CHANGE OF APPROACH]
+# Due to the size of this analysis it is unsustainable to do it in a script.
+# Hence I will continue it in Quarto
