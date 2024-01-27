@@ -12,7 +12,7 @@ library(feasts)
 library(tsibbledata)
 library(fabletools)
 library(modeltime)
-library(timetk)  
+library(timetk)
 
 # Geospatial libraries
 library(sf)
@@ -477,14 +477,36 @@ summary(fit_sales_by_diversity_log)
 # https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa
 
 # Lets create a small table to record the first pandemic important events
-events_date  <- c("2020-03-08",
-                  "2020-03-09",
-                  "2020-04-02")
 events_covid <- c("First cases announcement",
                   "Proclamation of Disaster Emergency",
-                  "Order: schools to remain closed through the end of April")
+                  "Order: schools to remain closed through the end of April",
+                  "President Biden declares the end to the national emergency")
 
-iowa_first_covid_events <- tibble(Event=events_covid, Date=events_date) %>% 
+events_date  <- c("2020-03-08",
+                  "2020-03-09",
+                  "2020-04-02",
+                  "2023-04-10")
+
+event_reach <- c("Iowa",
+                 "Iowa",
+                 "Iowa",
+                 "Nation wide")
+
+events_covid_source <- c("https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa",
+                         "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa",
+                         "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa",
+                         "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_the_United_States")
+
+events_color <- c("#8a0303",
+                  "#8a0303",
+                  "#8a0303",
+                  "#4a6741")
+
+iowa_first_covid_events <- tibble(Event  = events_covid, 
+                                  Date   = events_date,
+                                  Reach  = event_reach,
+                                  Source = events_covid_source,
+                                  Color  = events_color) %>% 
   mutate(Date = as_date(Date, format = "%Y-%m-%d"))
 
 # We will modify a little bit our products diversity to take into also account all the new products
@@ -504,9 +526,13 @@ sales_in_covid_times <- iowa_liquor_data %>%
   mutate(year = year(month)) %>% 
   left_join(iowa_population, by=c("year"="Year")) %>% # integrate with Iowa population data
   mutate(population_millions = Population/1e6, # a variable for the population in Millions
-         bottles_per_million_inhabitants = sale_bottles/population_millions) %>% # sales of bottles per million inhabitants 
+         bottles_per_million_inhabitants = sale_bottles/population_millions, # sales of bottles per million inhabitants 
+         bottles_per_capita = sale_bottles/Population) %>%  # sales per capita can also be useful
   summarise(n_different_products     = n_distinct(itemno),
-            bottles_sale_per_million = sum(bottles_per_million_inhabitants)) 
+            bottles_sale_per_million = sum(bottles_per_million_inhabitants),
+            bottles_sale_per_capita  = sum(bottles_per_capita)) %>% 
+  ungroup() %>% 
+  mutate(year = year(month))
 
 # Plot our time series
 ggplot(sales_in_covid_times, aes(x=month, y=bottles_sale_per_million)) +
@@ -577,36 +603,107 @@ sales_in_covid_times <- sales_in_covid_times %>%
   mutate(year = as.factor(year(month)),
          month_number = as.factor(month(month))) # we will add this variable to help us to distinguis between years 
 
-sales_in_covid_times_byyear_plot <- sales_in_covid_times %>% 
-  ggplot(aes(x=year, y=bottles_sale_per_million, color=month_number)) + 
-  geom_point()+
-  geom_smooth(method=lm, se=FALSE)
 
-sales_in_covid_times_byyear_plot
-ggplotly(sales_in_covid_times_byyear_plot)
+# Filter only the start and the end of the emergency
+covid_start_end_dates <- iowa_first_covid_events %>% 
+  filter(Date %in% c(min(iowa_first_covid_events$Date), max(iowa_first_covid_events$Date))) %>% 
+  mutate(event_summary=if_else(Date == min(Date), 'Start', 'End'))
 
-fit_sales_across_years <- lm(bottles_sale_per_million ~ month + year, data=sales_in_covid_times)
-summary(fit_sales_across_years)
-
-gv_sales_across_years <- gvlma::gvlma(fit_sales_across_years)
-summary(gv_sales_across_years)
-
-across_years_coeffs_ <- fit_sales_across_years$coefficients %>% 
-  as.list() %>% 
-  as_tibble()
-across_years_coeffs <- across_years_coeffs_ %>% 
-  pivot_longer(cols=all_of(colnames(across_years_coeffs_))) %>% 
-  rename(coef=name, estimate=value)
-
-across_years_coeffs %>% 
-  arrange(desc(estimate))
+# In this table we can appreciate the pandemic started at the beginning of 2020, and it ended (by decree) at the start of 2023. If we visualize this we have
 
 sales_in_covid_times %>% 
-  ggplot(aes(x=year, y=bottles_sale_per_million)) + 
-  geom_point()+
-  geom_smooth(method=lm, se=FALSE) +
-  facet_grid(month_number ~ .)
-  
+  as_tsibble(index=month) %>%
+  model(stl = STL(bottles_sale_per_million)) %>% 
+  components() %>% 
+  autoplot() + 
+  geom_vline(data = covid_start_end_dates, aes(xintercept = Date, color=event_summary)) +
+  scale_color_manual(values=c("#4a6741", "#8a0303")) +
+  theme(legend.position="bottom")
+
+
+
+# Remember that dataset that considered the sales of only items that existed previous to the pandemic? (sales_in_covid_times) We will use it here
+# to test in a formal manner if there was a difference in alcohol sales during the pandemic. First we will 
+# prepare each treatment data: pre-pandemic (2017, 2018, and 2019) and 
+# during-pandemic (2020, 2021, and 2022). Three years are selected
+
+pre_covid_data <- sales_in_covid_times %>% 
+  filter(year %in% c(2017, 2018, 2019)) # Now we have 36 months of aggregated data to compare
+
+during_covid_data <- sales_in_covid_times %>% 
+  filter(year %in% c(2020, 2021, 2022)) # Now we have 36 months of aggregated data to compare
+
+library(BEST)
+# BEST
+# Not available in CRAN anymore
+# install.packages('HDInterval') # BEST dependency
+# install.packages('https://cran.r-project.org/src/contrib/Archive/BEST/BEST_0.5.4.tar.gz')
+# Run an analysis, takes up to 1 min.
+BESTout <- BESTmcmc(during_covid_data$bottles_sale_per_million,
+                    pre_covid_data$bottles_sale_per_million, 
+                    parallel = FALSE)
+                          
+
+# Look at the result:
+# TO facilitate the display of results we will modify
+
+mainColor = "skyblue"
+dataColor = "red"
+comparisonColor = "darkgreen" 
+ROPEColor = "darkred"
+xlim <- range(BESTout$mu1, BESTout$mu2) #c(0, max(BESTout$mu1, BESTout$mu2))
+par(mfrow=c(2,1))
+plotPost(BESTout$mu1, 
+         xlim = xlim, 
+         cex.lab = 1.75, 
+         credMass = 0.95, 
+         showCurve = FALSE, 
+         xlab = bquote(mu[1]), 
+         main = paste("During Pandemic", "Mean "), 
+         mainColor = mainColor, 
+         comparisonColor = comparisonColor, 
+         ROPEColor = ROPEColor)
+               
+plotPost(BESTout$mu2, 
+         xlim = xlim, 
+         cex.lab = 1.75, 
+         credMass = 0.95, 
+         showCurve = FALSE, 
+         xlab = bquote(mu[2]), 
+         main = paste("Pre-pandemic", "Mean"), 
+         mainColor = mainColor, 
+         comparisonColor = comparisonColor, 
+         ROPEColor = ROPEColor)
+               
+         
+par(mfrow=c(1,1))
+plotPost(BESTout$mu1 - BESTout$mu2, 
+         xlim = c(-0.01, 150000),
+         compVal = mean(pre_covid_data$bottles_sale_per_million) * 0.05, # Increase in at least 5%
+         showCurve = FALSE, 
+         credMass = 0.95, 
+         xlab = bquote(mu[1] - mu[2]), 
+         cex.lab = 1.75, 
+         main = "Difference of Means", 
+         mainColor = mainColor, 
+         comparisonColor = comparisonColor, 
+         ROPEColor = ROPEColor)
+               
+         
+plotPost(BESTout$mu1 / BESTout$mu2, 
+         xlim = range(BESTout$mu1 / BESTout$mu2),
+         showCurve = FALSE, 
+         credMass = 0.95, 
+         xlab = bquote(mu[1] / mu[2]), 
+         cex.lab = 1.75, 
+         main = "Proportional Increase", 
+         mainColor = mainColor, 
+         comparisonColor = comparisonColor, 
+         ROPEColor = ROPEColor)
+               
+
+
+
 # -----------------------------------------------------------------
 # Some forecasting for 2024
 # This will be good to know in which days will be better to replenish the stores
@@ -698,8 +795,22 @@ first_map +
 # Now lets check if there is a relation of the "empty" zip code areas with the low population there
 iowa_less_populated_cities <- iowa_cities_population %>% 
   arrange(population) %>% # Arrange, less populated first 
-  head(500) # Check just 500 cities. Remember that we have around 570 zip codes with no data
+  head(600) # Check just 500 cities. Remember that we have around 570 zip codes with no data
 
 first_map + geom_sf(data=iowa_less_populated_cities, aes(), color='#8a0303')
 
+# -----------------------------------------------------------------
+# Check how many points fell into the gray area
+# QUEDE ACA
 
+
+# First let's isolate the gray area
+zip_codes_with_no_recorded_zip_codes <- iowa_zip_codes %>% 
+  filter(!zcta_code %in% liquor_sales_summary_by_zip$zipcode) %>% 
+  dplyr::pull(the_geom)
+
+iowa_less_populated_cities_points <- iowa_less_populated_cities$primary_point
+points_within_gray_area <- st_within(iowa_less_populated_cities_points, zip_codes_with_no_recorded_zip_codes)
+as.data.frame(points_within_gray_area)
+
+aa <- st_intersection(iowa_less_populated_cities_points, zip_codes_with_no_recorded_zip_codes)
