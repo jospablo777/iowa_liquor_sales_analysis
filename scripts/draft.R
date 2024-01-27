@@ -647,14 +647,14 @@ iowa_zip_codes_ <- iowa_zip_codes %>%
 
 # First visualization
 first_map <- iowa_zip_codes_ %>% 
-  ggplot(aes(fill=n_stores)) + 
-  geom_sf() +
+  ggplot() + 
+  geom_sf(aes(fill=n_stores)) +
   scale_fill_viridis() + 
   theme_bw()  
 
 ggplotly(first_map)
 
-# Now let's see if this matches with the most populated cities in Iowa. For this
+# Now let's see if this matches with the most populated cities in Iowa. Lucky us
 # we can download another data set from the Iowa Open Data portal
 # https://data.iowa.gov/Community-Demographics/Total-City-Population-by-Year/acem-thbp/about_data
 download_iowa_data(data_id       = 'acem-thbp',      # Taken from the data set url 
@@ -663,12 +663,27 @@ download_iowa_data(data_id       = 'acem-thbp',      # Taken from the data set u
                    total_of_rows = 40000,            # We checked in the web site that the row number was little more than 31k
                    batch_size    = 40000)
 
-iowa_cities_population <- read_iowa_data(folder_path ='data', data_name='iowa_cities_pop')
+iowa_cities_population <- read_iowa_data(folder_path ='data', data_name='iowa_cities_pop') %>% 
+  drop_na(primary_point) %>%    # If we have NA values in our geoms sf won't assimilate the df
+  st_as_sf(wkt='primary_point') %>% 
+  group_by(geographicname) %>% # let's filter for the last year in every city 
+  filter(year == max(year)) 
 
-first_map + 
-  geom_point(
-  aes(color = SID74, size = AREA, geometry = geometry),
-  stat = "sf_coordinates") 
+iowa_most_populated_cities <- iowa_cities_population %>% 
+  arrange(desc(population)) %>% # Arrange, most populated first 
+  head(30) # Keeps only the most populated 30
+  
+
+first_map + geom_sf(data=iowa_most_populated_cities,aes(size=population/1000), color='red')
+# Seems legit. The most populated cities in Iowa are the ones with the most liquor stores
+
+# Now lets check if there is a relation of the "empty" zip code areas with the low population there
+iowa_less_populated_cities <- iowa_cities_population %>% 
+  arrange(population) %>% # Arrange, less populated first 
+  head(200) # Check just 200 cities. Remember that we have arpund 500 zip codes with no data
+
+first_map + geom_sf(data=iowa_less_populated_cities, aes(), color='red')
+
 
 # Now we can appreciate that we do not have data for every zip code
 
