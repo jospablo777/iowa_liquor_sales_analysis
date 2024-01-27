@@ -60,3 +60,6 @@ r_pycaret/
 !drinking_holidays.csv
 !iowa_population.csv
 !missing_location_stores.csv
+
+# Exclude Python logs
+logs.log
