@@ -105,7 +105,8 @@ oldest_entry <- min(iowa_liquor_data$date)
 newest_entry <- max(iowa_liquor_data$date)
 
 time_range <- lubridate::interval(oldest_entry, newest_entry)
-time_length(time_range, unit="years")
+time_span  <- time_length(time_range, unit="years")
+time_span
 # So we have 12 years of data, that's a lot!
 
 # Is there any duplicated values in our df?
@@ -639,6 +640,9 @@ library(BEST)
 # install.packages('HDInterval') # BEST dependency
 # install.packages('https://cran.r-project.org/src/contrib/Archive/BEST/BEST_0.5.4.tar.gz')
 # Run an analysis, takes up to 1 min.
+# References for this: kind of analysis
+# https://jkkweb.sitehost.iu.edu/articles/Kruschke2013JEPG.pdf
+# https://link.springer.com/article/10.3758/s13423-016-1221-4
 BESTout <- BESTmcmc(during_covid_data$bottles_sale_per_million,
                     pre_covid_data$bottles_sale_per_million, 
                     parallel = FALSE)

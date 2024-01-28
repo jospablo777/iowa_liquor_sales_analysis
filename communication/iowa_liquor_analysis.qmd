@@ -1,27 +1,140 @@
 ---
-title: "Iowa Liquor Analysis"
-author: "Jose P. Barrantes"
+title: "Iowa Liquor Sales Analysis"
+author: 
+  name: "Jose P. Barrantes"
+  url: "https://www.linkedin.com/in/jose-barrantes/"
 format: html
 editor: visual
+theme:
+  dark: darkly
+  light: flatly
+  
 ---
 
-## Quarto
+## About this project
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+Here we will explore the...
 
-## Running Code
+## About the data set
 
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+We will work with the "Iowa Liquor Sales" dataset provided by the Iowa Open Data Platform. This data is constantly updated and licensed under CC, so the use is less restrictive than other kinds of data. This data consist in...
 
-```{r}
-1 + 1
-```
+## Libraries
 
-You can add options to executable code like this
+We will begin by setting up our R environment.
 
 ```{r}
-#| echo: false
-2 * 2
+#| label: setup
+#| include: true
+#| output: false
+
+library(tidyverse)
+library(feather)
+library(plotly)
+library(reticulate)
+source('../utils/get_data.R')
+source('../utils/data_processing.R')
+
+# Time series libraries
+library(fable)
+library(tsibble)
+library(feasts)
+library(tsibbledata)
+library(fabletools)
+library(modeltime)
+library(timetk)
+
+# Geospatial libraries
+library(sf)
+library(viridis) # color palette
+
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+## Get the data, and some performance considerations
+
+Please check utils/get_data.R for more details on the data pull. We will do this only once since, from now on, we will use a local copy of the data for speed issues. You can find the data set page [here](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data). With the function `download_iowa_data`, the data is downloaded in batches since downloading such big data sets can be troublesome or even impossible.
+
+There is also another function, `read_iowa_data`, to read the batches into a single dataframe. Since I worked for several days developing this analysis, I also saved a copy of the data in a `.feather` file to speed up things whenever I needed to load it.
+
+```{r}
+#| label: main_data_download
+#| eval: false
+
+# Call once
+download_iowa_data(data_id       = 'm3tr-qhgy',
+                   folder        = '../data',
+                   data_name     = 'iowa_liquor_data',
+                   total_of_rows = 29000000, # To the date, we have 28,176,372 rows in this data set
+                   batch_size    = 1000000)
+
+# Read locally saved data
+iowa_liquor_data <- read_iowa_data(folder_path='../data', data_name='iowa_liquor_data') # call once
+
+# Save the data in a memory friendly (binary) format. Load this file will be much faster.
+write_feather(iowa_liquor_data, '../data/iowa_liquor_data/iowa_liquor_data_full.feather') # save once
+
+```
+
+Now that we have all the data in our system, we can load it into memory to begin working with it. Also, you will see some other data files that we will use later to enrich the analysis:
+
+* Some of the booziest holidays in the US that I found on [alcohol.com](https://alcohol.org/guides/booziest-holidays/)
+* The Iowa population since the year 2012, available at [datacommons.org](https://datacommons.org/place/geoId/19?utm_medium=explore&mprop=count&popt=Person&hl=en)
+
+```{r}
+#| label: read_main_data
+#| output: false
+
+# Read the feather file with the liquor sales data
+iowa_liquor_data <- read_feather('../data/iowa_liquor_data/iowa_liquor_data_full.feather')
+
+# Most drinking holidays
+holidays <- read_csv('../data/drinking_holidays.csv') %>% 
+  mutate(date = as_date(Date, format = '%d-%B-%Y'))  # Set the date data type
+
+# Iowa population
+iowa_population <- read_csv('../data/iowa_population.csv') %>% 
+  mutate(pop_100k=Population/100000)  # Create a new variable
+```
+
+In the past snippet, we added an extra variable, `pop_100k`, the population of 100k inhabitants. Later, we will also get more data.
+
+Let's create new variables to enrich our data set, `liquor_type` indicates the type of liquor purchased in every receipt.
+
+```{r}
+#| label: add_liquor_type
+# Add the type of spirit/drink
+iowa_liquor_data <- iowa_liquor_data %>% 
+  mutate(
+    liquor_type = case_when(
+      grepl('VODK', category_name)  ~ 'VODKA',
+      grepl('WHISK', category_name)  ~ 'WHISKY',
+      grepl('RUM', category_name)  ~ 'RUM',
+      grepl('SCHN', category_name)  ~ 'SCHNAPPS',
+      grepl('TEQ', category_name)  ~ 'TEQUILA',
+      grepl('BRANDIE', category_name) | grepl('BRANDY', category_name) ~ 'BRANDY',
+      grepl('GIN', category_name)  ~ 'GIN',
+      grepl('MEZC', category_name)  ~ 'MEZCAL',
+      grepl('CREM', category_name) | grepl('CREAM', category_name) ~ 'CREAM',
+      .default = 'OTHER'
+      )
+    )
+```
+
+## Exploratory Data Analysis (EDA)
+
+Here, we will start by getting to know the data set briefly. Let's begin with finding the time span we have to play with.
+
+```{r}
+# lets check the range of time of our data
+oldest_entry <- min(iowa_liquor_data$date)
+newest_entry <- max(iowa_liquor_data$date)
+
+time_range <- lubridate::interval(oldest_entry, newest_entry)
+time_span  <- time_length(time_range, unit="years")
+time_span
+```
+
+So we have `r round(time_span, 1)` years of data, that's a lot!
+
+
+
