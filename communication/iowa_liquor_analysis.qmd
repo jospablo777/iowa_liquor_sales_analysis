@@ -8,7 +8,6 @@ editor: visual
 theme:
   dark: darkly
   light: flatly
-  
 ---
 
 ## About this project
@@ -18,6 +17,8 @@ Here we will explore the...
 ## About the data set
 
 We will work with the "Iowa Liquor Sales" dataset provided by the Iowa Open Data Platform. This data is constantly updated and licensed under CC, so the use is less restrictive than other kinds of data. This data consist in...
+
+If you run this analysis I recommend you to use a machine with at least 32 GB of RAM.. due to the size of our main data set...
 
 ## Libraries
 
@@ -48,13 +49,24 @@ library(timetk)
 library(sf)
 library(viridis) # color palette
 
+# Formatting and communication
+library(rmarkdown)
+library(quartoExtra)
+source('ggplot_themes/ggplot_theme_Publication-2.R')
+
+darkmode_theme_set(
+  dark = theme_dark_blue(),
+  light = theme_Publication()
+)
+
+
 ```
 
 ## Get the data, and some performance considerations
 
 Please check utils/get_data.R for more details on the data pull. We will do this only once since, from now on, we will use a local copy of the data for speed issues. You can find the data set page [here](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data). With the function `download_iowa_data`, the data is downloaded in batches since downloading such big data sets can be troublesome or even impossible.
 
-There is also another function, `read_iowa_data`, to read the batches into a single dataframe. Since I worked for several days developing this analysis, I also saved a copy of the data in a `.feather` file to speed up things whenever I needed to load it.
+There is also another function, `read_iowa_data`, to read the batches into a single data frame. Since I worked for several days developing this analysis, I also saved a copy of the data in a `.feather` file to speed up things whenever I needed to load it.
 
 ```{r}
 #| label: main_data_download
@@ -77,8 +89,8 @@ write_feather(iowa_liquor_data, '../data/iowa_liquor_data/iowa_liquor_data_full.
 
 Now that we have all the data in our system, we can load it into memory to begin working with it. Also, you will see some other data files that we will use later to enrich the analysis:
 
-* Some of the booziest holidays in the US that I found on [alcohol.com](https://alcohol.org/guides/booziest-holidays/)
-* The Iowa population since the year 2012, available at [datacommons.org](https://datacommons.org/place/geoId/19?utm_medium=explore&mprop=count&popt=Person&hl=en)
+-   Some of the booziest holidays in the US that I found on [alcohol.com](https://alcohol.org/guides/booziest-holidays/)
+-   The Iowa population since the year 2012, available at [datacommons.org](https://datacommons.org/place/geoId/19?utm_medium=explore&mprop=count&popt=Person&hl=en)
 
 ```{r}
 #| label: read_main_data
@@ -102,6 +114,7 @@ Let's create new variables to enrich our data set, `liquor_type` indicates the t
 
 ```{r}
 #| label: add_liquor_type
+
 # Add the type of spirit/drink
 iowa_liquor_data <- iowa_liquor_data %>% 
   mutate(
@@ -120,11 +133,13 @@ iowa_liquor_data <- iowa_liquor_data %>%
     )
 ```
 
-## Exploratory Data Analysis (EDA)
+# Exploratory Data Analysis (EDA)
 
 Here, we will start by getting to know the data set briefly. Let's begin with finding the time span we have to play with.
 
 ```{r}
+#| label: check_time_span
+
 # lets check the range of time of our data
 oldest_entry <- min(iowa_liquor_data$date)
 newest_entry <- max(iowa_liquor_data$date)
@@ -135,6 +150,230 @@ time_span
 ```
 
 So we have `r round(time_span, 1)` years of data, that's a lot!
+
+Next, are there any duplicated values in our data frame? Since our data set is too big, we cannot use duplicated() performantly, so let's check by the invoice number.
+
+```{r}
+#| label: duplicates_in_data
+
+n_distinct(iowa_liquor_data$invoice_line_no) == nrow(iowa_liquor_data) 
+```
+
+An equal number of rows and distinct invoice IDs mean that every invoice differs. So, no duplicates were found :)
+
+How many locations are missing? This is important since we will do some geospatial analysis later.
+
+```{r}
+#| label: n_missing_locations
+
+missing_location <- sum(is.na(iowa_liquor_data$store_location))
+format(missing_location, big.mark=",")
+```
+
+Around `r round(missing_location/1e6, 2)` M of invoices do not have location. Later we will deal with this issue.
+
+```{r}
+#| label: n_no_location_stores
+
+n_no_location_stores <- iowa_liquor_data %>% 
+  filter(is.na(store_location)) %>% 
+  dplyr::pull(store) %>% 
+  n_distinct()
+
+n_no_location_stores
+```
+
+But the missing data is only from `r n_no_location_stores` stores.
+
+Let's check how many missing values we have per column.
+
+```{r}
+#| label: missing_values__per_col
+
+missing_per_column <- colSums(is.na(iowa_liquor_data)) %>% 
+  as.list() %>% 
+  as_tibble() %>% 
+  pivot_longer(all_of(colnames(iowa_liquor_data))) %>% 
+  rename(variable=name, missing=value) %>% 
+  arrange(desc(missing)) # We present first the variables with more NAs
+
+paged_table(missing_per_column) 
+```
+
+We have three missing item IDs, but the sales fields have no missing values, which is good since we're very interested in the sales.
+
+## Exploring time series structure
+
+Prepare the data first.
+
+```{r}
+consumption_day_summary <- iowa_liquor_data %>% 
+  group_by(day = floor_date(date, unit = "day")) %>% 
+  summarise(n_invoices = n(),
+            n_bottles  = sum(sale_bottles, na.rm = TRUE),
+            liters     = sum(sale_liters, na.rm  = TRUE),
+            spent_usd  = sum(sale_dollars, na.rm = TRUE)) %>% 
+  mutate(Year = year(day)) %>% 
+  left_join(iowa_population) %>% 
+  mutate(liters_per_100k   = liters/pop_100k,     # Liters sold by every 100k inhabitants
+         liters_per_capita = liters/Population,   # Liters sold by every per capita
+         week_day          = name_days(day),      
+         weekend           = is_weekend(day))
+```
+
+
+First impression of our daily data.
+
+```{r, out.width = "100%"}
+#| label: first_time_series_check
+#| classes: dark-light
+#| column: screen-inset-shaded
+
+consumption_time_series_day_plot <- 
+  ggplot(consumption_day_summary, aes(x=as.Date(day), y=n_bottles)) + # , color='trick_line_col'
+  geom_line(color="#8d8d8d") + 
+  theme(legend.position = "none") +
+  labs(x='Date', y = 'Sold bottles')
+
+consumption_time_series_day_plot  
+```
+
+It seems that there are a lot of purchases near to zero. Could all the liquor stores agree to not purchase in certain days occasions? Let's re-check considering the week days in the chart.
+
+```{r, out.width = "100%"}
+#| classes: dark-light
+#| column: screen-inset-shaded
+#| 
+consumption_time_series_day_plot <- 
+  ggplot(consumption_day_summary, aes(x=as.Date(day), y=n_bottles)) + 
+  geom_line(color="#8d8d8d") + 
+  geom_point(aes(color=as.factor(week_day))) +
+  labs(x='Date', y = 'Sold bottles', color="Day of the week")
+
+consumption_time_series_day_plot
+```
+
+Fridays, Saturdays, and Sundays are the days with fewer purchases. Indeed, the stores do not receive or make orders on weekends.
+
+Now, let's explore the calendar effect in our time series data. Here, we will gain a general notion of how the human cycles surrounding the calendar (such as weekends and holidays) affect liquor sales. This will be very easy with the library `timetk` by Matt Dancho. The function `plot_seasonal_diagnostics`, creates the relevant plots for this analysis.
+
+```{r}
+#| label: calendar_effect
+
+consumption_day_summary %>% 
+  mutate(day_=ymd(day)) %>% 
+  as_tsibble(index=day_) %>%
+  fill_gaps(n_bottles = 0)  %>% # Fill with zeroes the days that do not have receipts
+  as_tibble() %>% 
+  timetk::plot_seasonal_diagnostics(day_, n_bottles)
+```
+
+
+## Anomaly detection in time series
+
+As part of our EDA process we can look for anomalies in our time series structure. For this we will use an unsupervised anomaly detection algorithm: the isolation forest algorithm... FALTA...
+
+Let's prepare our data for the iForest run. We will pull this data directly from our python session
+
+```{r}
+#| label: iforest_data_prep
+data_iforest <- consumption_day_summary %>% 
+  select(day, n_bottles, week_day, weekend) %>%  # Relevant features
+  mutate(month = month(day, abbr = FALSE, label=TRUE)) # the month will also be a feature
+```
+
+Please note that the code below is written in Python. We can leverage the cool stuff in the Python community by utilizing the `reticulate` R library. Then, in our Python environment, we can use the PyCaret library, which is an top library for running complex machine learning workflows with minimal code. This saves us a lot of time, so we can focus on what is happening with the liquor sales. The code shown below has been modified from Moez Ali's [tutorial](https://pycaret.gitbook.io/docs/learn-pycaret/official-blog/time-series-anomaly-detection-with-pycaret).
+
+```{python}
+#| label: iforest_run
+#| output: false
+
+# Data load. We pull it from our R environment
+time_series_data = r.data_iforest
+
+# Data prep. Set the date as the DataFrame index, then, drop the column day
+time_series_data.set_index('day', drop=True, inplace=True)
+
+
+# PyCaret setup
+from pycaret.anomaly import *
+s = setup(time_series_data, session_id = 11)
+
+# Train model
+iforest = create_model('iforest', fraction = 0.1)
+iforest_results = assign_model(iforest)
+```
+
+Please notice above that we extract the data we prepared in R, `data_iforest`, with the Python global variable `r`. The converse also happens in the R environment, and we use the `reticulate` global variable, `py`, to bring the PyCaret results into R.
+
+```{r}
+#| label: iforest_retrieval
+iforest_results <- py$iforest_results %>% 
+  mutate(Anomaly = as.factor(Anomaly)) # We will use the anomaly as a factor
+
+# We cannot plot the date as a df index
+iforest_results$day <- as.Date(rownames(iforest_results), format = "%Y-%m-%d")
+```
+
+Let's see the results!
+
+```{r, out.width = "100%"}
+#| label: iforest_results_plot
+#| classes: dark-light
+#| column: screen-inset-shaded
+
+anomalies_plot <- ggplot(iforest_results, aes(x=day, y=n_bottles)) +
+  geom_line(color="#8d8d8d") + 
+  geom_point(aes(color=Anomaly)) + 
+  scale_color_manual(values=c("#58bbc3", "#e78170")) +
+  labs(x='Date', y = 'Sold bottles', color="Anomaly") 
+
+anomalies_plot
+```
+
+It seems that most of the anomalies are those near zero on weekends (Friday, Saturday, and Sunday); this is because more businesses are closed on weekends; there are no purchases there, all good. But wait a second what are those in the 4th and the 11th of October 2013, those look suspicious. In fact, let's check all the anomalies over the percentile 50%. We are not interested in the lower anomalies because we know that some purchases are on weekends, but most establishments do not place orders on weekends.
+
+```{r}
+#| label: upper_anomalies_data
+
+# Prepare a vector with the percentiles
+percentiles <- seq(from = 0, to = 1, by = 0.05)
+percentile_bottles <- quantile(iforest_results$n_bottles, percentiles)
+
+# We filter all the anomalies above the percentile 50%
+anomalies_over_p50_bottles <- iforest_results %>% 
+  filter(n_bottles > percentile_bottles['50%'], 
+         Anomaly == 1) %>% 
+  # Added some extra variables
+  mutate(month_number     = month(day),
+         month_day_number = mday(day) + rnorm(n(), sd=0.3), # Added some Gaussian noise to the day number to appreciate in the plot the holidays that overlap every year
+         year_day_number  = yday(day))
+
+# Get some holidays
+daynumber_by_month_holidays <- holidays %>% 
+  filter(Type %in% c('Holiday', 'TV')) %>% 
+  mutate(month_number = month(date),
+         month_day_number   = mday(date)) %>% 
+  group_by(Event) %>% 
+  summarise(mean_month = mean(month_number),     # Month will always be the same, mean function is to have a result in the aggregated summary
+            mean_day   = mean(month_day_number)) # The day vary every year for certain holidays, hence we want an average coordinate for the day axis
+
+```
+
+```{r, out.width = "100%"}
+#| label: anomalies_first_scatter_plot
+#| classes: dark-light
+#| column: screen-inset-shaded
+#| 
+daynumber_by_month <- ggplot(anomalies_over_p50_bottles, aes(x=month_day_number, y=month_number)) +
+  geom_point(color="#8d8d8d") +
+  geom_point(data=daynumber_by_month_holidays, aes(x=mean_day, y=mean_month), size=7, color='green', alpha=0.5) +
+  geom_text(data = daynumber_by_month_holidays, nudge_x = 0.25, nudge_y = 0.25, 
+            check_overlap = T, aes(label=Event, x=mean_day, y=mean_month), color="#8d8d8d") +
+  labs(x='Month day number', y = 'Month number') 
+
+daynumber_by_month
+```
 
 
 
