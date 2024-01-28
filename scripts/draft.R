@@ -116,7 +116,8 @@ n_distinct(iowa_liquor_data$invoice_line_no) == nrow(iowa_liquor_data)
 # No duplicates were found :)
 
 # How many locations are missing?
-sum(is.na(iowa_liquor_data$store_location))
+missing_location <- sum(is.na(iowa_liquor_data$store_location))
+missing_location
 # Around 2.5M of invoices do not have location
 
 no_location_stores <- iowa_liquor_data %>% 
@@ -154,7 +155,7 @@ consumption_day_summary <- iowa_liquor_data %>%
   group_by(day = floor_date(date, unit = "day")) %>% 
   summarise(n_invoices = n(),
             n_bottles  = sum(sale_bottles, na.rm = TRUE),
-            liters     = sum(sale_liters, na.rm = TRUE),
+            liters     = sum(sale_liters, na.rm  = TRUE),
             spent_usd  = sum(sale_dollars, na.rm = TRUE)) %>% 
   mutate(Year = year(day)) %>% 
   left_join(iowa_population) %>% 
@@ -186,7 +187,12 @@ ggplotly(consumption_time_series_day_plot)
 # Friday, Saturday, and Sundays are the days with the less purchases
 
 # TO DO: in each week, determine the day with best and worst purchases. Then, count all the Mondays, Tuesdays, etc. with best/worst sales
-
+consumption_day_summary %>% 
+  mutate(day_=ymd(day)) %>% 
+  as_tsibble(index=day_) %>%
+  fill_gaps(n_bottles = 0)  %>% # Fill with zeroes the days that do not have receipts
+  as_tibble() %>% 
+  timetk::plot_seasonal_diagnostics(day_, n_bottles)
 
 # -----------------------------------------------------------------
 # Anomaly detection in time series
