@@ -1,0 +1,14 @@
+project:
+  type: website
+  output-dir: docs
+website:
+  title: TITLE
+format:
+  html:
+    theme:
+      light:
+      - cosmo
+      - light.scss
+      dark:
+      - slate
+      - dark.scss
