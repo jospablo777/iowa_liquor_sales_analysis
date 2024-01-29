@@ -3,7 +3,11 @@ title: "Iowa Liquor Sales Analysis"
 author: 
   name: "Jose P. Barrantes"
   url: "https://www.linkedin.com/in/jose-barrantes/"
+bibliography: references.bib
 format: html
+knitr:
+  opts_chunk:
+    out.width: "100%"
 editor: visual
 theme:
   dark: darkly
@@ -221,10 +225,9 @@ consumption_day_summary <- iowa_liquor_data %>%
          weekend           = is_weekend(day))
 ```
 
-
 First impression of our daily data.
 
-```{r, out.width = "100%"}
+```{r}
 #| label: first_time_series_check
 #| classes: dark-light
 #| column: screen-inset-shaded
@@ -240,7 +243,7 @@ consumption_time_series_day_plot
 
 It seems that there are a lot of purchases near to zero. Could all the liquor stores agree to not purchase in certain days occasions? Let's re-check considering the week days in the chart.
 
-```{r, out.width = "100%"}
+```{r}
 #| classes: dark-light
 #| column: screen-inset-shaded
 #| 
@@ -268,6 +271,7 @@ consumption_day_summary %>%
   timetk::plot_seasonal_diagnostics(day_, n_bottles)
 ```
 
+Please interact with these charts by hovering over the elements.
 
 ## Anomaly detection in time series
 
@@ -317,7 +321,7 @@ iforest_results$day <- as.Date(rownames(iforest_results), format = "%Y-%m-%d")
 
 Let's see the results!
 
-```{r, out.width = "100%"}
+```{r}
 #| label: iforest_results_plot
 #| classes: dark-light
 #| column: screen-inset-shaded
@@ -360,14 +364,14 @@ daynumber_by_month_holidays <- holidays %>%
 
 ```
 
-```{r, out.width = "100%"}
+```{r}
 #| label: anomalies_first_scatter_plot
 #| classes: dark-light
 #| column: screen-inset-shaded
 #| 
 daynumber_by_month <- ggplot(anomalies_over_p50_bottles, aes(x=month_day_number, y=month_number)) +
   geom_point(color="#8d8d8d") +
-  geom_point(data=daynumber_by_month_holidays, aes(x=mean_day, y=mean_month), size=7, color='green', alpha=0.5) +
+  geom_point(data=daynumber_by_month_holidays, aes(x=mean_day, y=mean_month), size=7, color='#58bbc3', alpha=0.5) +
   geom_text(data = daynumber_by_month_holidays, nudge_x = 0.25, nudge_y = 0.25, 
             check_overlap = T, aes(label=Event, x=mean_day, y=mean_month), color="#8d8d8d") +
   labs(x='Month day number', y = 'Month number') 
@@ -375,5 +379,414 @@ daynumber_by_month <- ggplot(anomalies_over_p50_bottles, aes(x=month_day_number,
 daynumber_by_month
 ```
 
+We can also check how these anomalies (the ones above quantile 50%) distribute across the year.
+
+```{r}
+#| label: anomaly_density_across_year
+#| classes: dark-light
+#| column: screen-inset-shaded
+
+ggplot(anomalies_over_p50_bottles, aes(x=year_day_number)) +
+  geom_density(color="darkblue", fill="lightblue") +
+  labs(x='Year day number', y = 'Density') 
+```
+
+It is clear the more heavy drinking days of the year are concentrated at the end of the year
+
+## Exploring time series composition
+
+To extract more insights from our time series data, it's useful to break it down into its three main components: trend, season, and the remainder. To do this, we'll use the STL decomposition method, which stands for Seasonal and Trend decomposition using Loess.
+
+STL is a great choice as it can detect various types of seasonality and can be tailored to specific needs. Moreover, it's a reliable method that generally delivers accurate results. You can find more information about STL in the book ["Forecasting: Principles and Practice"](https://otexts.com/fpp3/) by Hyndman and Athanasopoulos [-@Hyndman2021].
+
+```{r, out.height="130%"}
+#| label: first_ts_composition_plot
+#| classes: dark-light
+#| column: screen-inset-shaded
+
+consumption_day_summary %>% 
+  select(day, n_bottles) %>% 
+  mutate(day=ymd(day)) %>% 
+  as_tsibble(index=day) %>%
+  fill_gaps(n_bottles = 0) %>% # We will assume that for the days with no data are because not purchases occurred, which have sense since most of them are on weekends (i.e. lot of people don't work)
+  model(stl = STL(n_bottles)) %>% 
+  components() %>% 
+  autoplot(color='#8d8d8d') 
+```
+
+We are presented with four charts in this visualization, the first one is our time serie, then, it is followed by its components:
+
+-   The trend in liquor sales over through time
+
+The above is a lot of information, let's aggregate the info in months to analyze the chart with less granularity.
+
+```{r}
+#| label: time_series_comp_data_set
+#| classes: dark-light
+#| column: screen-inset-shaded
+
+consumption_month_decomposition <- consumption_day_summary %>% 
+  select(day, n_bottles) %>% 
+  group_by(month=yearmonth(day)) %>%
+  summarise(n_bottles=sum(n_bottles)) %>% 
+  as_tsibble(index=month) %>%
+  model(stl = STL(n_bottles)) %>% 
+  components()  
+```
+
+Now we plot at a month granularity.
+
+```{r}
+#| label: ts_composition_month_aggplot
+#| classes: dark-light
+#| column: screen-inset-shaded
+
+consumption_month_decomposition %>% 
+  autoplot(color='#8d8d8d') %>% 
+  ggplotly()
+```
+
+This chart is **interactive**. Please hover over the parts that catches your attention. The seasonal behavior of alcohol consumption is interesting throughout the year (`season_year` tile). We notice three peaks, the first one being in June (which is relatively modest), the second in October, and the third in December. Also, we observe an increasing trend in the acquisition of alcohol by stores, which could be due to an increase in the population, as indicated by the following chart. Data obtained from [datacommons.org](https://datacommons.org/place/geoId/19?utm_medium=explore&mprop=count&popt=Person&hl=en).
+
+```{r}
+#| label: population_growth_plot
+#| classes: dark-light
+#| column: screen-inset-shaded
+
+# Estimated population of Iowa since 2012
+ggplot(iowa_population, aes(x=Year, y=Population/1e6)) +
+  geom_point(color='#8d8d8d') +
+  geom_smooth(method=lm, se=FALSE, color='#696969') +
+  labs(x="Year", y="Population in Millions")
+
+```
+
+Over the past 12 years, the population has increased. However, could offering a wider variety of products increase liquor sales? Would appeal to diverse tastes impact the amount of alcohol sold?
+
+```{r}
+#| label: product_diversity_decomp_plot
+
+iowa_liquor_data %>% 
+  select(date, itemno) %>% 
+  group_by(month = yearmonth(date)) %>% 
+  summarise(n_different_products=n_distinct(itemno)) %>% 
+  as_tsibble(index = month) %>%
+  model(stl = STL(n_different_products)) %>% 
+  components() %>% 
+  autoplot() %>% 
+  ggplotly()
+```
+
+Ulalà... look at this beauty! It seems like every year more and more products are being introduced to the market. Another interesting observation is that there is always a rise in the variety of available products during October. Is this because of the upcoming year-end celebrations or the introduction of autumn flavors such as pumpkin spice? Could it be that stores are promoting new products to potential customers as a way to encourage sales towards the end of the year?
+
+Yes, the variety of alcoholic beverages available in the market has increased, which means that there are more options to cater to different tastes. For example, some people may not like raspberry vodka but might prefer tamarind Smirnoff, or they may enjoy the one that comes in a bottle with a skull design. Having more options ensures that everyone can find a drink that they like.
+
+## Determining the effect of diversity in inventory over sales
+
+We noticed a sales increase in bottles over time. Is the rise merely due to population growth, or does the market offer play a role? Let's find out!
+
+Our plan is to investigate whether the number of diverse products in the market is a reliable indicator of sales volume. It's important to note that diversity encompasses not only different flavors, but also various sizes and presentations. For instance, a smaller bottle of the same rum or a special edition of your favorite brand with collectible shot glasses.
+
+Now that we know that the population of Iowas has been increasing and that it could be a potential **confounder** when we try to estimate the effect of the diversity of products, we should consider it. To begin with, we must adjust the sales figures based on the population data (i.e., normalize).
+
+```{r}
+# Data set to test our hypothesis of inventory diversity and more sales
+sale_by_diversity <- iowa_liquor_data %>% 
+  select(date, itemno, sale_bottles) %>% 
+  group_by(month = yearmonth(date)) %>%   # We will explore monthly data in our (available) history
+  mutate(year = year(month)) %>% 
+  left_join(iowa_population, by = c("year"="Year")) %>% # integrate with Iowa population data
+  mutate(population_millions = Population/1e6, # a variable for the population in Millions
+         bottles_per_million_inhabitants = sale_bottles/population_millions) %>% # sales of bottles per million inhabitants 
+  summarise(n_different_products     = n_distinct(itemno),
+            bottles_sale_per_million = sum(bottles_per_million_inhabitants)) 
+```
+
+It is advisable to avoid using `sale_dollars` as inflation could act as a confounder. To include dollars, we should adjust for inflation and remove its effect.
+
+```{r}
+#| label: inventory_diversity_vs_sales
+#| classes: dark-light
+#| column: screen-inset-shaded
+
+ggplot(sale_by_diversity, aes(x = n_different_products, y = bottles_sale_per_million)) + 
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE) +
+  labs(x = "Different products available", y = "Bottles sold per million inhabitants")
+```
+
+Very nice! It seems that the diversity of products is a good predictor. Now, we can get more numerical info from this if we run a linear model.
+
+```{r}
+# Linear model
+fit_sales_by_diversity <- lm(bottles_sale_per_million ~ n_different_products,
+                             data = sale_by_diversity)
+
+summary(fit_sales_by_diversity)
+```
+
+There are a lot of good tutorials and textbooks that dig deeper into the validation of linear models, so we will skip that part and use `gvlma` to check the assumptions in a time-saving manner.
+
+```{r}
+gv_sales_by_diversity <- gvlma::gvlma(fit_sales_by_diversity)
+summary(gv_sales_by_diversity)
+```
+
+The model only failed to meet the Link Function assumption, which indicates that we have either wrongly specified the link function or missed an important predictor in our model. You can refer to Peña and Slate [-@PenaSlate2006] for more information. However, since the model satisfies the Skewness, Kurtosis, and Heteroscedasticity assumptions, we will temporarily ignore the link function issue, and address this later.
+
+Let's make sense of our model.
+
+```{r}
+fit_sales_by_diversity_summary <- summary(fit_sales_by_diversity)
+fit_sales_by_diversity_summary 
+```
+
+First, we can observe in the R-squared that the model can explain `r round(fit_sales_by_diversity_summary$r.squared * 100, 0)`% of our data variability, i.e., the diversity in alcoholic products is a good predictor over all liquor sale in Iowa. Second, we can observe that the estimate for the variable `n_different_products` is 263. We interpret this as follows: with the release of each new product in the market, the monthly (alcohol) sales in Iowa will increase in 263 bottles, per million of inhabitants, in the State of Iowa.
+
+### But how to present this information to non-technical people?
+
+Imagine that you work for a **liquor distributor** and are presenting your findings to the top executives. Firstly, the phrase "will increase in 263 bottles per million inhabitants" is fairly complex. Therefore, and assuming you are in the year 2027 and you know that the population is approximately 3.8 million, you could say something simpler, such as:
+
+> *"For every new product, or new presentation of our old product, we launch in Iowa, we will sell around 1000 (i.e., `263.45x3.8`) units monthly"*
+
+Notice that we say "around 1000" to facilitate the digestion of the info. Round numbers decrease the [cognitive load](https://en.wikipedia.org/wiki/Cognitive_load), are easy to remember, and will be easier to assimilate them by your audience. Of course it is not that simple, if the product is well liked by the population it will sell even more, but if it sucks it wont sell. Also, having more products in the inventory could increase costs in logistics, marketing, and so on.
+
+For a different scenario, now you are a consultant working for a local health organization that is trying to combat the negative effects of excessive alcohol consumption. You have been tasked with presenting the results of your research to **government and health entities**. Your presentation should include the outcomes of your investigation, such as:
+
+> *"The growing variety of alcohol products in the market is making it more attractive to consumers. To address this, we suggest imposing an additional tax on sellers who have more than X number of different alcoholic products in their inventory. The revenue generated from this tax can be allocated towards funding rehabilitation clinics and other programs aimed at helping those struggling with alcohol addiction."*
+
+### Remember that link function assumption violation?
+
+Let's go back to the part in which our model didn't fulfill all the requirements for good inference. So, we didn't accomplish all the assumptions proposed by Peña and Slate (2006); their approach is quite attractive since the proposed framework includes a global metric and considers the  interplay of assumptions
+
+We will run almost the same model, just with a little difference. Our variables will be log-transformed.
+
+```{r}
+ggplot(sale_by_diversity, aes(x=log(n_different_products), y=log(bottles_sale_per_million))) + 
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE)
+```
+
+The plot does not seem that different. Now we proceed with the model.
+
+```{r}
+# Linear model, log transformed variables
+fit_sales_by_diversity_log <- lm(log(bottles_sale_per_million) ~ log(n_different_products), data=sale_by_diversity)
+# Check assumptions
+gv_sales_by_diversity_log <- gvlma::gvlma(fit_sales_by_diversity_log)
+summary(gv_sales_by_diversity_log)
+```
+
+Great! Now we fulfill the global stat, so we can say that the inference derived from this model will be more robust. Continuing with the model...
+
+```{r}
+fit_sales_by_diversity_log_summary <- summary(fit_sales_by_diversity_log)
+fit_sales_by_diversity_log_summary
+```
+
+The model still explains `r round(fit_sales_by_diversity_log_summary$r.squared, 0)`% of the variability in the data, but with different coefficients. Log-Log regression (log dependent variable, log predictor) has an intuitive interpretation. For every 1% increase in X, there will be a β% increase (or decrease if β is negative) in the dependent variable. In this scenario, β is estimated to be 0.95, this means that a 1% increase in the diversity of products sold in the state of Iowa, will result in a 95% increase in bottle sales. In other words, every time the inventory diversifies by 1%, the number of bottles sold (almost) doubles. However, it's crucial to also consider the cost of logistics, available space on shelves and cellars, and the supply chain.
+
+Now, let's move to a question that to this data science project.
+
+## Did the COVID-19 pandemic increase the alcohol consumption of the population?
+
+There is a great [Wikipedia page](https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa) that summarizes the history line of COVID-19 in Iowa. This is a great resource! We can extract some valuable information for our analysis from there. This info will be in the `iowa_first_covid_events` data set.
+
+```{r}
+#| label: covid19_events_data_set
+#| include: false
+#| output: false
+
+# Let's create a small data frame with some COVID-19 events, and their occurrence date
+events_covid <- c("First cases announcement",
+                  "Proclamation of Disaster Emergency",
+                  "Order: schools to remain closed through the end of April",
+                  "President Biden declares the end to the national emergency")
+
+events_date  <- c("2020-03-08",
+                  "2020-03-09",
+                  "2020-04-02",
+                  "2023-04-10")
+
+event_reach <- c("Iowa",
+                 "Iowa",
+                 "Iowa",
+                 "Nation wide")
+
+events_covid_source <- c("https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa",
+                         "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa",
+                         "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa",
+                         "https://en.wikipedia.org/wiki/COVID-19_pandemic_in_the_United_States")
+
+events_color <- c("#8a0303",
+                  "#8a0303",
+                  "#8a0303",
+                  "#4a6741")
+
+iowa_first_covid_events <- tibble(Event  = events_covid, 
+                                  Date   = events_date,
+                                  Reach  = event_reach,
+                                  Source = events_covid_source,
+                                  Color  = events_color) %>% 
+  mutate(Date = as_date(Date, format = "%Y-%m-%d"))
+
+```
+
+We will modify our data set to consider the inventory diversity effect and control for this confounder. First, let's get a vector with all the items available before `2020-04-02`.
+
+```{r}
+items_prepandemic <- iowa_liquor_data %>% 
+  filter(date < max(iowa_first_covid_events$Date)) %>% 
+  dplyr::pull(itemno) %>% 
+  unique()
+```
+
+Then, let's filter our data to exclude the receipts that include any post-pandemic item; after that, we can do a monthly aggregation of our time series.
+
+```{r}
+sales_in_covid_times <- iowa_liquor_data %>% 
+  select(date, itemno, sale_bottles) %>% 
+  filter(itemno %in% items_prepandemic) %>% # only prepandemic items
+  group_by(month = yearmonth(date)) %>%   # We will explore monthly data in our (available) history
+  mutate(year = year(month)) %>% 
+  left_join(iowa_population, by = c("year"="Year")) %>% # integrate with Iowa population data
+  mutate(population_millions = Population/1e6, # a variable for the population in Millions
+         bottles_per_million_inhabitants = sale_bottles/population_millions, # sales of bottles per million inhabitants 
+         bottles_per_capita = sale_bottles/Population) %>%  # sales per capita can also be useful
+  summarise(n_different_products     = n_distinct(itemno),
+            bottles_sale_per_million = sum(bottles_per_million_inhabitants),
+            bottles_sale_per_capita  = sum(bottles_per_capita)) %>% 
+  ungroup() %>% 
+  mutate(year = year(month))
+```
+
+Plot our time series
+
+```{r}
+ggplot(sales_in_covid_times, aes(x=month, y=bottles_sale_per_million)) +
+  geom_line() + 
+  xlab("")
+```
+
+Let's get a little more detailed with our chart and decompose as we did before
+
+```{r}
+sales_in_covid_times %>% 
+  as_tsibble(index = month) %>%
+  model(stl = STL(bottles_sale_per_million)) %>% 
+  components() %>% 
+  autoplot() %>% 
+  ggplotly()
+```
+
+Let's check the peak of sales after the adjustment
+
+```{r}
+day_with_more_sales <- sales_in_covid_times %>% 
+  filter(bottles_sale_per_million == max(bottles_sale_per_million))
+
+paged_table(day_with_more_sales) 
+```
+
+Now you must be thinking "Hey, as new products appear, also old ones disappear. The same year you restricted the emergence of new products, we observe a decrease in sales." And you're right, let's put the restriction in new products much before the pandemic and then render a new trend chart.
+
+We create a vector with only the items available several years before pandemic. Set the new product filter in 2016 should be anough.
+
+```{r}
+items_restriction_before_pandemic <- iowa_liquor_data %>% 
+  filter(date < as.Date("2016-01-01")) %>%  # We have chosen the start of 2016. More than four years appart from the pandemic
+  dplyr::pull(itemno) %>% 
+  unique()
+```
+
+Generate time series data set
+
+```{r}
+sales_precovid_times <- iowa_liquor_data %>% 
+  select(date, itemno, sale_bottles) %>% 
+  filter(itemno %in% items_restriction_before_pandemic) %>% # only items that existed before year 2016
+  group_by(month = yearmonth(date)) %>%   
+  mutate(year = year(month)) %>% 
+  left_join(iowa_population, by = c("year"="Year")) %>% # integrate with Iowa population data
+  mutate(population_millions = Population/1e6, # a variable for the population in Millions
+         bottles_per_million_inhabitants = sale_bottles/population_millions) %>% # sales of bottles per million inhabitants 
+  summarise(n_different_products     = n_distinct(itemno),
+            bottles_sale_per_million = sum(bottles_per_million_inhabitants)) 
+```
+
+Plot our time series
+
+```{r}
+ggplot(sales_precovid_times, aes(x=month, y=bottles_sale_per_million)) +
+  geom_line() + 
+  xlab("")
+```
 
 
+Let's get a little more detailed with our chart and decompose as we did before
+
+```{r}
+sales_precovid_times %>% 
+  as_tsibble(index=month) %>%
+  model(stl = STL(bottles_sale_per_million)) %>% 
+  components() %>% 
+  autoplot() %>% 
+  ggplotly()
+```
+
+Please notice that the trend is almost the same.
+
+Let's see which now the peak of alcohol purchases.
+
+```{r}
+day_with_more_sales_2016_restriction <- sales_precovid_times %>% 
+  filter(bottles_sale_per_million == max(bottles_sale_per_million))
+
+paged_table(day_with_more_sales_2016_restriction) 
+```
+
+And there you have it! It is still Dec 2020. So we can rule out hte hypothesis of the decrease in sales due to the exclusion of new products while the old ones were drop into the oblivion. If a product is good and sells well, it should remain into the market
+
+
+### Now back to our `sales_in_covid_times` data set
+
+We will formaly test if there was an increase in the alcohol sales during the pandemic, and will also try to quantify the effect
+
+```{r}
+sales_in_covid_times <- sales_in_covid_times %>% 
+  mutate(year = as.factor(year(month)),
+         month_number = as.factor(month(month))) # we will add this variable to help us to distinguish between years 
+```
+
+Filter only the start and the end of the emergency
+
+```{r}
+covid_start_end_dates <- iowa_first_covid_events %>% 
+  filter(Date %in% c(min(iowa_first_covid_events$Date), max(iowa_first_covid_events$Date))) %>% 
+  mutate(event_summary=if_else(Date == min(Date), 'Start', 'End'))
+```
+
+
+In this table we can appreciate the pandemic started at the beginning of 2020, and it ended (by decree) at the start of 2023. If we visualize this we have
+```{r}
+sales_in_covid_times %>% 
+  as_tsibble(index=month) %>%
+  model(stl = STL(bottles_sale_per_million)) %>% 
+  components() %>% 
+  autoplot() + 
+  geom_vline(data = covid_start_end_dates, aes(xintercept = Date, color=event_summary)) +
+  scale_color_manual(values=c("#4a6741", "#8a0303")) +
+  theme(legend.position="bottom")
+```
+
+Remember that dataset that considered the sales of only items that existed previous to the pandemic? (sales_in_covid_times) We will use it here to test in a formal manner if there was a difference in alcohol sales during the pandemic. First we will prepare each treatment data: pre-pandemic (2017, 2018, and 2019) and during-pandemic (2020, 2021, and 2022). Three years are selected.
+
+```{r}
+pre_covid_data <- sales_in_covid_times %>% 
+  filter(year %in% c(2017, 2018, 2019)) # Now we have 36 months of aggregated data to compare
+
+during_covid_data <- sales_in_covid_times %>% 
+  filter(year %in% c(2020, 2021, 2022)) # Now we have 36 months of aggregated data to compare
+```
+
+We will use a Bayesian approac...
