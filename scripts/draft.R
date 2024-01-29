@@ -359,9 +359,6 @@ summary(gv_population_increase)
 # The model seem to be robust, since it complies with the model assumptions
 
 
-# QUEDE AQUÍ: el análisis de abajo debe de ser ajustado a botellas per capita
-# Probar dejando filtrando los nuevos productos a partir de un punto en el tiempo
-
 # -----------------------------------------------------------------
 # Lets check if the amount of different products available in the market
 # are a good predictor of units sold. Please notice that diversity no only comes
