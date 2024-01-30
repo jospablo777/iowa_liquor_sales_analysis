@@ -855,7 +855,7 @@ But why should we complicate ourselves with such esoteric approaches? (it is pre
 
 -   Third, the decision threshold for determining whether there is a difference between the treatment and control groups (such as during a pandemic vs. non-pandemic scenario) is straightforward to communicate and interpret. It's also considered less arbitrary since it requires knowledge of the underlying phenomena.
 
-For a comprehensive review on the subject, check Kruschke [-@Kruschke2018]. It is convenient for a data scientist to understand how this technique works, so it is worth taking a couple of hours of your time for this read.
+For a comprehensive review on the subject, check Kruschke [-@KruschkeLiddell2017]. It is convenient for a data scientist to understand how this technique works, so it is worth taking a couple of hours of your time for this read.
 
 For this test we will need to install the `BEST` library, but it was brought it down from CRAN some time ago. But no worries, you can install it with the following code.
 
@@ -933,7 +933,7 @@ plotPost(BESTout$mu1 - BESTout$mu2,
          ROPEColor = ROPEColor)
 ```
 
-Now, let's look how many times the alcohol consumption increased.
+Now, let's look how many times the alcohol consumption increased. If you want to learn more about ROPE interpretation and this kind of inference, please revisit [-@Kruschke2018]
 
 ```{r}
 #| label: visualize_proportional_effect
