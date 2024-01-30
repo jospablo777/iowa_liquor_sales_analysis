@@ -10,8 +10,8 @@ knitr:
     out.width: "100%"
 editor: visual
 theme:
-  dark: darkly
   light: flatly
+  dark: darkly
 ---
 
 ## About this project
@@ -58,10 +58,14 @@ library(rmarkdown)
 library(quartoExtra)
 source('ggplot_themes/ggplot_theme_Publication-2.R')
 
+# Setup quartoExtra
 darkmode_theme_set(
   dark = theme_dark_blue(),
   light = theme_Publication()
 )
+
+# Statistical inference
+library(BEST)
 
 
 ```
@@ -422,8 +426,6 @@ The above is a lot of information, let's aggregate the info in months to analyze
 
 ```{r}
 #| label: time_series_comp_data_set
-#| classes: dark-light
-#| column: screen-inset-shaded
 
 consumption_month_decomposition <- consumption_day_summary %>% 
   select(day, n_bottles) %>% 
@@ -438,11 +440,10 @@ Now we plot at a month granularity.
 
 ```{r}
 #| label: ts_composition_month_aggplot
-#| classes: dark-light
-#| column: screen-inset-shaded
+
 
 consumption_month_decomposition %>% 
-  autoplot(color='#8d8d8d') %>% 
+  autoplot(color = '#8d8d8d') %>% 
   ggplotly()
 ```
 
@@ -455,9 +456,9 @@ This chart is **interactive**. Please hover over the parts that catches your att
 
 # Estimated population of Iowa since 2012
 ggplot(iowa_population, aes(x=Year, y=Population/1e6)) +
-  geom_point(color='#8d8d8d') +
-  geom_smooth(method=lm, se=FALSE, color='#696969') +
-  labs(x="Year", y="Population in Millions")
+  geom_point(color = '#8d8d8d') +
+  geom_smooth(method = lm, se = FALSE, color = '#696969') +
+  labs(x = "Year", y = "Population in Millions")
 
 ```
 
@@ -473,7 +474,7 @@ iowa_liquor_data %>%
   as_tsibble(index = month) %>%
   model(stl = STL(n_different_products)) %>% 
   components() %>% 
-  autoplot() %>% 
+  autoplot(color = '#8d8d8d') %>% 
   ggplotly()
 ```
 
@@ -490,6 +491,8 @@ Our plan is to investigate whether the number of diverse products in the market 
 Now that we know that the population of Iowas has been increasing and that it could be a potential **confounder** when we try to estimate the effect of the diversity of products, we should consider it. To begin with, we must adjust the sales figures based on the population data (i.e., normalize).
 
 ```{r}
+#| label: sale_by_diversity_dataset
+
 # Data set to test our hypothesis of inventory diversity and more sales
 sale_by_diversity <- iowa_liquor_data %>% 
   select(date, itemno, sale_bottles) %>% 
@@ -510,14 +513,16 @@ It is advisable to avoid using `sale_dollars` as inflation could act as a confou
 #| column: screen-inset-shaded
 
 ggplot(sale_by_diversity, aes(x = n_different_products, y = bottles_sale_per_million)) + 
-  geom_point() +
-  geom_smooth(method=lm, se=FALSE) +
+  geom_point(color = '#8d8d8d') +
+  geom_smooth(method = lm, se = FALSE, color = '#696969') +
   labs(x = "Different products available", y = "Bottles sold per million inhabitants")
 ```
 
 Very nice! It seems that the diversity of products is a good predictor. Now, we can get more numerical info from this if we run a linear model.
 
 ```{r}
+#| label: fit_sales_by_diversity
+
 # Linear model
 fit_sales_by_diversity <- lm(bottles_sale_per_million ~ n_different_products,
                              data = sale_by_diversity)
@@ -528,6 +533,8 @@ summary(fit_sales_by_diversity)
 There are a lot of good tutorials and textbooks that dig deeper into the validation of linear models, so we will skip that part and use `gvlma` to check the assumptions in a time-saving manner.
 
 ```{r}
+#| label: fit_sales_by_diversity_assumptions
+
 gv_sales_by_diversity <- gvlma::gvlma(fit_sales_by_diversity)
 summary(gv_sales_by_diversity)
 ```
@@ -537,6 +544,8 @@ The model only failed to meet the Link Function assumption, which indicates that
 Let's make sense of our model.
 
 ```{r}
+#| label: fit_sales_by_diversity_summary
+
 fit_sales_by_diversity_summary <- summary(fit_sales_by_diversity)
 fit_sales_by_diversity_summary 
 ```
@@ -557,19 +566,26 @@ For a different scenario, now you are a consultant working for a local health or
 
 ### Remember that link function assumption violation?
 
-Let's go back to the part in which our model didn't fulfill all the requirements for good inference. So, we didn't accomplish all the assumptions proposed by Peña and Slate (2006); their approach is quite attractive since the proposed framework includes a global metric and considers the  interplay of assumptions
+Let's go back to the part in which our model didn't fulfill all the requirements for good inference. So, we didn't accomplish all the assumptions proposed by Peña and Slate (2006); their approach is quite attractive since the proposed framework includes a global metric and considers the interplay of assumptions
 
 We will run almost the same model, just with a little difference. Our variables will be log-transformed.
 
 ```{r}
+#| label: log_transformed_fit_plot
+#| classes: dark-light
+#| column: screen-inset-shaded
+
 ggplot(sale_by_diversity, aes(x=log(n_different_products), y=log(bottles_sale_per_million))) + 
-  geom_point() +
-  geom_smooth(method=lm, se=FALSE)
+  geom_point(color = '#8d8d8d') +
+  geom_smooth(method = lm, se = FALSE, color = '#696969') +
+  labs(x = "Log(Number of different products)", y = "Log(Bottles sold per million inhabitants)")
 ```
 
 The plot does not seem that different. Now we proceed with the model.
 
 ```{r}
+#| label: fit_log_model
+
 # Linear model, log transformed variables
 fit_sales_by_diversity_log <- lm(log(bottles_sale_per_million) ~ log(n_different_products), data=sale_by_diversity)
 # Check assumptions
@@ -580,6 +596,8 @@ summary(gv_sales_by_diversity_log)
 Great! Now we fulfill the global stat, so we can say that the inference derived from this model will be more robust. Continuing with the model...
 
 ```{r}
+#| label: fit_log_model_results
+
 fit_sales_by_diversity_log_summary <- summary(fit_sales_by_diversity_log)
 fit_sales_by_diversity_log_summary
 ```
@@ -635,8 +653,12 @@ iowa_first_covid_events <- tibble(Event  = events_covid,
 We will modify our data set to consider the inventory diversity effect and control for this confounder. First, let's get a vector with all the items available before `2020-04-02`.
 
 ```{r}
+#| label: get_prepandemic_items
+
+pandemic_start_date <- min(iowa_first_covid_events$Date)
+
 items_prepandemic <- iowa_liquor_data %>% 
-  filter(date < max(iowa_first_covid_events$Date)) %>% 
+  filter(date < pandemic_start_date) %>% 
   dplyr::pull(itemno) %>% 
   unique()
 ```
@@ -644,15 +666,17 @@ items_prepandemic <- iowa_liquor_data %>%
 Then, let's filter our data to exclude the receipts that include any post-pandemic item; after that, we can do a monthly aggregation of our time series.
 
 ```{r}
+#| label: filter_exclude_pandemic_new_items
+
 sales_in_covid_times <- iowa_liquor_data %>% 
   select(date, itemno, sale_bottles) %>% 
-  filter(itemno %in% items_prepandemic) %>% # only prepandemic items
+  filter(itemno %in% items_prepandemic) %>% # Only consider items that were present before the pandemic to contro for confounding
   group_by(month = yearmonth(date)) %>%   # We will explore monthly data in our (available) history
   mutate(year = year(month)) %>% 
-  left_join(iowa_population, by = c("year"="Year")) %>% # integrate with Iowa population data
-  mutate(population_millions = Population/1e6, # a variable for the population in Millions
-         bottles_per_million_inhabitants = sale_bottles/population_millions, # sales of bottles per million inhabitants 
-         bottles_per_capita = sale_bottles/Population) %>%  # sales per capita can also be useful
+  left_join(iowa_population, by = c("year"="Year")) %>% # Integrate with Iowa population data
+  mutate(population_millions = Population/1e6,          # A variable for the population in Millions
+         bottles_per_million_inhabitants = sale_bottles/population_millions, # Sales of bottles per million inhabitants 
+         bottles_per_capita = sale_bottles/Population) %>%  # Sales per capita can also be useful
   summarise(n_different_products     = n_distinct(itemno),
             bottles_sale_per_million = sum(bottles_per_million_inhabitants),
             bottles_sale_per_capita  = sum(bottles_per_capita)) %>% 
@@ -660,32 +684,42 @@ sales_in_covid_times <- iowa_liquor_data %>%
   mutate(year = year(month))
 ```
 
-Plot our time series
+To control for this confounding factor, we will keep the variable `n_different_products` constant by including only items that did exist before the pandemic started (i.e., `r pandemic_start_date`). By doing so, we can ensure that any observed changes in the outcome variable are due to the intervention being studied and not the confounding variable. If you want to learn more about causal inference, I recommend checking out Molak [-@Molak2023] for a practical introduction, and Pearl and Mackenzie [-@PearlMackenzie2018] for a theoretical grasp.
+
+Let's have a look at this data.
 
 ```{r}
-ggplot(sales_in_covid_times, aes(x=month, y=bottles_sale_per_million)) +
-  geom_line() + 
-  xlab("")
+#| label: sales_in_covid_times_first_plot
+#| classes: dark-light
+#| column: screen-inset-shaded
+
+ggplot(sales_in_covid_times, aes(x=month, y=bottles_sale_per_capita)) +
+  geom_line(color = '#8d8d8d') + 
+  labs(x = "Date", y = "Bottles sale per capita")
 ```
 
 Let's get a little more detailed with our chart and decompose as we did before
 
 ```{r}
+#| label: sales_in_covid_times_decmomp_plot
+
 sales_in_covid_times %>% 
   as_tsibble(index = month) %>%
-  model(stl = STL(bottles_sale_per_million)) %>% 
+  model(stl = STL(bottles_sale_per_capita)) %>% 
   components() %>% 
-  autoplot() %>% 
+  autoplot(color = '#8d8d8d') %>% 
   ggplotly()
 ```
 
 Let's check the peak of sales after the adjustment
 
 ```{r}
-day_with_more_sales <- sales_in_covid_times %>% 
+#| label: check_month_with_more_sales
+
+month_with_more_sales <- sales_in_covid_times %>% 
   filter(bottles_sale_per_million == max(bottles_sale_per_million))
 
-paged_table(day_with_more_sales) 
+paged_table(month_with_more_sales) 
 ```
 
 Now you must be thinking "Hey, as new products appear, also old ones disappear. The same year you restricted the emergence of new products, we observe a decrease in sales." And you're right, let's put the restriction in new products much before the pandemic and then render a new trend chart.
@@ -693,8 +727,10 @@ Now you must be thinking "Hey, as new products appear, also old ones disappear. 
 We create a vector with only the items available several years before pandemic. Set the new product filter in 2016 should be anough.
 
 ```{r}
+#| label: items_restriction_before_pandemic
+
 items_restriction_before_pandemic <- iowa_liquor_data %>% 
-  filter(date < as.Date("2016-01-01")) %>%  # We have chosen the start of 2016. More than four years appart from the pandemic
+  filter(date < as.Date("2016-01-01")) %>%  # We have chosen the start of 2016. More than four years apart from the pandemic
   dplyr::pull(itemno) %>% 
   unique()
 ```
@@ -702,35 +738,44 @@ items_restriction_before_pandemic <- iowa_liquor_data %>%
 Generate time series data set
 
 ```{r}
+#| label: dataset_restriction_2016
+
 sales_precovid_times <- iowa_liquor_data %>% 
   select(date, itemno, sale_bottles) %>% 
-  filter(itemno %in% items_restriction_before_pandemic) %>% # only items that existed before year 2016
+  filter(itemno %in% items_restriction_before_pandemic) %>% # Only items that existed before year 2016
   group_by(month = yearmonth(date)) %>%   
   mutate(year = year(month)) %>% 
-  left_join(iowa_population, by = c("year"="Year")) %>% # integrate with Iowa population data
-  mutate(population_millions = Population/1e6, # a variable for the population in Millions
-         bottles_per_million_inhabitants = sale_bottles/population_millions) %>% # sales of bottles per million inhabitants 
+  left_join(iowa_population, by = c("year"="Year")) %>% # Integrate with Iowa population data
+  mutate(population_millions = Population/1e6, # A variable for the population in Millions
+         bottles_per_million_inhabitants = sale_bottles/population_millions,
+         bottles_per_capita = sale_bottles/Population) %>% # Sales of bottles per million inhabitants
   summarise(n_different_products     = n_distinct(itemno),
-            bottles_sale_per_million = sum(bottles_per_million_inhabitants)) 
+            bottles_sale_per_million = sum(bottles_per_million_inhabitants),
+            bottles_sale_per_capita  = sum(bottles_per_capita)) 
 ```
 
 Plot our time series
 
 ```{r}
-ggplot(sales_precovid_times, aes(x=month, y=bottles_sale_per_million)) +
-  geom_line() + 
-  xlab("")
-```
+#| label: sales_in_restriction_2016_plot
+#| classes: dark-light
+#| column: screen-inset-shaded
 
+ggplot(sales_precovid_times, aes(x=month, y=bottles_sale_per_capita)) +
+  geom_line(color = '#8d8d8d') + 
+  labs(x = "Date", y = "Bottles sale per capita")
+```
 
 Let's get a little more detailed with our chart and decompose as we did before
 
 ```{r}
+#| label: sales_in_restriction_2016_decomp_plot
+
 sales_precovid_times %>% 
   as_tsibble(index=month) %>%
   model(stl = STL(bottles_sale_per_million)) %>% 
   components() %>% 
-  autoplot() %>% 
+  autoplot(color = '#8d8d8d') %>% 
   ggplotly()
 ```
 
@@ -739,49 +784,58 @@ Please notice that the trend is almost the same.
 Let's see which now the peak of alcohol purchases.
 
 ```{r}
+#| label: check_month_with_more_sales_2016_restrict
+
 day_with_more_sales_2016_restriction <- sales_precovid_times %>% 
   filter(bottles_sale_per_million == max(bottles_sale_per_million))
 
 paged_table(day_with_more_sales_2016_restriction) 
 ```
 
-And there you have it! It is still Dec 2020. So we can rule out hte hypothesis of the decrease in sales due to the exclusion of new products while the old ones were drop into the oblivion. If a product is good and sells well, it should remain into the market
-
+And there you have it! It is still Dec 2020. So we can rule out the hypothesis of the decrease in sales due to the exclusion of new products while the old ones were drop into the oblivion. If a product is good and sells well, it should remain into the market
 
 ### Now back to our `sales_in_covid_times` data set
 
-We will formaly test if there was an increase in the alcohol sales during the pandemic, and will also try to quantify the effect
+We will conduct a formal test to assess whether there was an increase in alcohol sales during the pandemic, aiming to quantify the effect.
 
 ```{r}
+#| label: sales_in_covid_times_formal_test_dataset
+
 sales_in_covid_times <- sales_in_covid_times %>% 
-  mutate(year = as.factor(year(month)),
-         month_number = as.factor(month(month))) # we will add this variable to help us to distinguish between years 
+  mutate(year = as.factor(year(month)),          # we will add this variable to help us to distinguish between years 
+         month_number = as.factor(month(month))) 
 ```
 
 Filter only the start and the end of the emergency
 
 ```{r}
+#| label: filter_start_end_dates
+
 covid_start_end_dates <- iowa_first_covid_events %>% 
   filter(Date %in% c(min(iowa_first_covid_events$Date), max(iowa_first_covid_events$Date))) %>% 
   mutate(event_summary=if_else(Date == min(Date), 'Start', 'End'))
 ```
 
-
 In this table we can appreciate the pandemic started at the beginning of 2020, and it ended (by decree) at the start of 2023. If we visualize this we have
+
 ```{r}
+#| label: sales_in_covid_times_decomp_plot_w_range
+
 sales_in_covid_times %>% 
-  as_tsibble(index=month) %>%
+  as_tsibble(index = month) %>%
   model(stl = STL(bottles_sale_per_million)) %>% 
   components() %>% 
-  autoplot() + 
+  autoplot(color = '#8d8d8d') + 
   geom_vline(data = covid_start_end_dates, aes(xintercept = Date, color=event_summary)) +
-  scale_color_manual(values=c("#4a6741", "#8a0303")) +
-  theme(legend.position="bottom")
+  scale_color_manual(values = c("#4a6741", "#8a0303")) +
+  theme(legend.position = "bottom") 
 ```
 
 Remember that dataset that considered the sales of only items that existed previous to the pandemic? (sales_in_covid_times) We will use it here to test in a formal manner if there was a difference in alcohol sales during the pandemic. First we will prepare each treatment data: pre-pandemic (2017, 2018, and 2019) and during-pandemic (2020, 2021, and 2022). Three years are selected.
 
 ```{r}
+#| label: data_for_best_test
+
 pre_covid_data <- sales_in_covid_times %>% 
   filter(year %in% c(2017, 2018, 2019)) # Now we have 36 months of aggregated data to compare
 
@@ -789,4 +843,110 @@ during_covid_data <- sales_in_covid_times %>%
   filter(year %in% c(2020, 2021, 2022)) # Now we have 36 months of aggregated data to compare
 ```
 
-We will use a Bayesian approac...
+In order to investigate whether there was a change in alcohol sales as a result of the COVID-19 pandemic, we will be using a statistical technique developed by psychologist John K. Kruschke [-@Kruschke2013], who is known for the book of the puppies (Doing Bayesian Data Analysis). This technique is called "Bayesian Estimation Supersedes the t-Test," BEST for short.
+
+![Kruschke's book cover](images/kruschke_puppies.png)
+
+But why should we complicate ourselves with such esoteric approaches? (it is pretty popular, though..).
+
+-   First, quantifying uncertainty is crucial when we conduct statistical inference. We want to be sure how much we can doubt in our decisions.
+
+-   Second, this approach is quite powerful since it allow us to speak in terms of the **magnitude of the effect**, which gives us an idea of how serious the situation is. It also has a beautiful interpretation that facilitates much of the communication of results to the stakeholders.
+
+-   Third, the decision threshold for determining whether there is a difference between the treatment and control groups (such as during a pandemic vs. non-pandemic scenario) is straightforward to communicate and interpret. It's also considered less arbitrary since it requires knowledge of the underlying phenomena.
+
+For a comprehensive review on the subject, check Kruschke [-@Kruschke2018]. It is convenient for a data scientist to understand how this technique works, so it is worth taking a couple of hours of your time for this read.
+
+For this test we will need to install the `BEST` library, but it was brought it down from CRAN some time ago. But no worries, you can install it with the following code.
+
+```{r}
+#| label: install_best
+
+# Please uncoment below lines if you want to install it
+# install.packages('HDInterval') # Your system may complain during BEST install if you don have this dependency
+# install.packages('https://cran.r-project.org/src/contrib/Archive/BEST/BEST_0.5.4.tar.gz')
+```
+
+Then we load the library and run the MCMC process to estimate the posteriors.
+
+```{r}
+#| label: run_mcmc
+
+BESTout <- BESTmcmc(during_covid_data$bottles_sale_per_million,
+                    pre_covid_data$bottles_sale_per_million, 
+                    parallel = FALSE)
+```
+
+To facilitate the display of the results we will rely in the `plotPost` function from the library.
+
+```{r}
+#| label: visualize_posteriors
+
+# Some setup for the charts
+mainColor = "skyblue"
+dataColor = "red"
+comparisonColor = "darkgreen" 
+ROPEColor = "darkred"
+xlim <- range(BESTout$mu1, BESTout$mu2)
+
+# First plot
+par(mfrow=c(2,1))
+plotPost(BESTout$mu1, 
+         xlim = xlim, 
+         cex.lab = 1.75, 
+         credMass = 0.95, 
+         showCurve = FALSE, 
+         xlab = bquote(mu[1]), 
+         main = paste("During Pandemic", "Mean "), 
+         mainColor = mainColor, 
+         comparisonColor = comparisonColor, 
+         ROPEColor = ROPEColor)
+               
+plotPost(BESTout$mu2, 
+         xlim = xlim, 
+         cex.lab = 1.75, 
+         credMass = 0.95, 
+         showCurve = FALSE, 
+         xlab = bquote(mu[2]), 
+         main = paste("Pre-pandemic", "Mean"), 
+         mainColor = mainColor, 
+         comparisonColor = comparisonColor, 
+         ROPEColor = ROPEColor)
+```
+
+Now we visualize the magnitude of the effect.
+
+```{r}
+#| label: visualize_effect
+
+par(mfrow=c(1,1))
+plotPost(BESTout$mu1 - BESTout$mu2, 
+         xlim = range(0, max(BESTout$mu1 - BESTout$mu2)),
+         compVal = mean(pre_covid_data$bottles_sale_per_million) * 0.05, # Increase in at least 5%
+         showCurve = FALSE, 
+         credMass = 0.95, 
+         xlab = bquote(mu[1] - mu[2]), 
+         cex.lab = 1.75, 
+         main = "Difference of Means", 
+         mainColor = mainColor, 
+         comparisonColor = comparisonColor, 
+         ROPEColor = ROPEColor)
+```
+
+Now, let's look how many times the alcohol consumption increased.
+
+```{r}
+#| label: visualize_proportional_effect
+
+
+plotPost(BESTout$mu1 / BESTout$mu2, 
+         xlim = range(BESTout$mu1 / BESTout$mu2),
+         showCurve = FALSE, 
+         credMass = 0.95, 
+         xlab = bquote(mu[1] / mu[2]), 
+         cex.lab = 1.75, 
+         main = "Proportional Increase", 
+         mainColor = mainColor, 
+         comparisonColor = comparisonColor, 
+         ROPEColor = ROPEColor)
+```
