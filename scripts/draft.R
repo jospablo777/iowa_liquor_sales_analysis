@@ -517,7 +517,7 @@ iowa_first_covid_events <- tibble(Event  = events_covid,
 
 # First, let's get a vector with all the items available before "2020-04-02"
 items_prepandemic <- iowa_liquor_data %>% 
-  filter(date < max(iowa_first_covid_events$Date)) %>% 
+  filter(date < min(iowa_first_covid_events$Date)) %>% 
   dplyr::pull(itemno) %>% 
   unique()
 
@@ -685,7 +685,7 @@ plotPost(BESTout$mu2,
          
 par(mfrow=c(1,1))
 plotPost(BESTout$mu1 - BESTout$mu2, 
-         xlim = c(-0.01, 150000),
+         xlim = range(BESTout$mu1 - BESTout$mu2),
          compVal = mean(pre_covid_data$bottles_sale_per_million) * 0.05, # Increase in at least 5%
          showCurve = FALSE, 
          credMass = 0.95, 
