@@ -366,7 +366,7 @@ summary(gv_population_increase)
 # bottle of the same rum, or an special tequila edition of your favorite brand
 # that includes collective shot glasses
 
-# But  first, now that we know that the population of Iowas have been increasing, and 
+# But  first, now that we know that the population of Iowas have been increasing, and
 # that it could be a potential confounder when we try to estimate the effect of the
 # diversity of products, we should to take it into account.
 sale_by_diversity <- iowa_liquor_data %>% 
@@ -379,14 +379,14 @@ sale_by_diversity <- iowa_liquor_data %>%
   summarise(n_different_products     = n_distinct(itemno),
             bottles_sale_per_million = sum(bottles_per_million_inhabitants)) 
 # Better not to use sale_dollars since the inflation will be another confounder. If we want to
-# include dollars, we could adjust for inflation and then remove the effect of this 
+# include dollars, we could adjust for inflation and then remove the effect of this
 # confounder
 
 
 ggplot(sale_by_diversity, aes(x=n_different_products, y=bottles_sale_per_million)) + 
   geom_point() +
   geom_smooth(method=lm, se=FALSE)
-# Very nice! It seems that the diversity of products is a good predictor. Now, 
+# Very nice! It seems that the diversity of products is a good predictor. Now,
 # we can get more numerical info from this if we run a linear model
 
 # Linear model
@@ -396,12 +396,12 @@ summary(fit_sales_by_diversity)
 
 # There are a lot of good tutorials and textbook that dig deeper
 # into the validation of linear models, so we will skip that part and use
-# gvlma  to check the assumptions in a time saving manner. 
+# gvlma  to check the assumptions in a time saving manner.
 
 gv_sales_by_diversity <- gvlma::gvlma(fit_sales_by_diversity)
 summary(gv_sales_by_diversity)
-# The only assumption don't met was the Link Function one. This suggest that the 
-# we misspecified the link function, or that we forgot to include an important predictor in 
+# The only assumption don't met was the Link Function one. This suggest that the
+# we misspecified the link function, or that we forgot to include an important predictor in
 # our model. You can check more in Peña and Slate (2006) Global Validation of Linear Model Assumptions.
 # Since the model fulfill the  Skewness, Kurtosis, and Heteroscedasticity assumptions,
 # we will put the link function issue to the side (for now).
@@ -418,12 +418,12 @@ summary(fit_sales_by_diversity)
 
 # But how to present this information to non-technical people?
 
-# Let's say that you're working for a liquor distributor, and now you're 
-# presenting your findings to the C-level execs. First consider that the 
-# expression "will increase in 263 bottles, per million of inhabitants" is too 
-# complex. With that in mind, assuming you are in 2027 and that you know that the 
-# population then is around 3.8M, you can say something like "For 
-# every new product (or new presentation of our old product) we launch in Iowa 
+# Let's say that you're working for a liquor distributor, and now you're
+# presenting your findings to the C-level execs. First consider that the
+# expression "will increase in 263 bottles, per million of inhabitants" is too
+# complex. With that in mind, assuming you are in 2027 and that you know that the
+# population then is around 3.8M, you can say something like "For
+# every new product (or new presentation of our old product) we launch in Iowa
 # we will sell around 1000 (i.e., 263.45*3.8) units monthly" # Notice that we say "around 1000" to facilitate the digestion of the info. Round numbers decrease the cognitive load, are easy to remember, and will be easier to assimilate them by your audience.
 # Of course it is not that simple, if the product is well liked by the population it will sell
 # even more, but if it sucks it wont sell. Also, having more products in the inventory could
@@ -433,7 +433,7 @@ summary(fit_sales_by_diversity)
 # Presenting this to the gov and health entities. Now let's assume that you're a consultant
 # for a local health organization trying to fight the aftermath of excessive drinking. You would
 # present the results such as "The increase in diversity makes the alcohol consumption more appealing
-# to the consumer, so we can propose an extra tax to the sellers above X amount of different alcoholic products in the inventory. 
+# to the consumer, so we can propose an extra tax to the sellers above X amount of different alcoholic products in the inventory.
 # The amount collected will be directed to fund rehabilitation clinics and..."
 
 
@@ -464,10 +464,10 @@ summary(fit_sales_by_diversity_log)
 # Still, the model explain 68% of the variability in the data, but now
 # the coefficients are different. One of the advantages of the Log-Log regression
 # (log dependent variable, log predictor) is its intuitive interpretation: for
-# every increase in 1% of X we will have a β% increase (or decrease if β is negative) 
+# every increase in 1% of X we will have a β% increase (or decrease if β is negative)
 # in our dependent variable. In this case the estimate for β is 0.95, that mean
 # that if we increase our diversity of products by 1% we will sell 95% more bottles,
-# in other words, we duplicate (x2) the amount of bottles sold every time we 
+# in other words, we duplicate (x2) the amount of bottles sold every time we
 # diversify in 1% our stock. That's a lot, but again we have to considerate also
 # the cost in logistics, space available in our shelf and cellars, supply chain...
 
@@ -597,7 +597,7 @@ sales_precovid_times %>%
 sales_precovid_times %>% 
   filter(bottles_sale_per_million == max(bottles_sale_per_million))
 # And there you have it! It is still Dec 2020.
-# So we can rule out hte hypothesis of the decrease in sales due to the exclusion 
+# So we can rule out hte hypothesis of the decrease in sales due to the exclusion
 # of new products while the old ones were drop into the oblivion. If a product is good and sells well, it should remain into the market
 
 
@@ -605,7 +605,7 @@ sales_precovid_times %>%
 
 sales_in_covid_times <- sales_in_covid_times %>% 
   mutate(year = as.factor(year(month)),
-         month_number = as.factor(month(month))) # we will add this variable to help us to distinguis between years 
+         month_number = as.factor(month(month))) # we will add this variable to help us to distinguish between years 
 
 
 # Filter only the start and the end of the emergency
@@ -627,8 +627,8 @@ sales_in_covid_times %>%
 
 
 # Remember that dataset that considered the sales of only items that existed previous to the pandemic? (sales_in_covid_times) We will use it here
-# to test in a formal manner if there was a difference in alcohol sales during the pandemic. First we will 
-# prepare each treatment data: pre-pandemic (2017, 2018, and 2019) and 
+# to test in a formal manner if there was a difference in alcohol sales during the pandemic. First we will
+# prepare each treatment data: pre-pandemic (2017, 2018, and 2019) and
 # during-pandemic (2020, 2021, and 2022). Three years are selected
 
 pre_covid_data <- sales_in_covid_times %>% 
