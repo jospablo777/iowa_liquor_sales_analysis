@@ -831,7 +831,7 @@ sales_in_covid_times %>%
   theme(legend.position = "bottom") 
 ```
 
-Remember that dataset that considered the sales of only items that existed previous to the pandemic? (sales_in_covid_times) We will use it here to test in a formal manner if there was a difference in alcohol sales during the pandemic. First we will prepare each treatment data: pre-pandemic (2017, 2018, and 2019) and during-pandemic (2020, 2021, and 2022). Three years are selected.
+Remember that data set that considered the sales of only items that existed previous to the pandemic? (sales_in_covid_times) We will use it here to test in a formal manner if there was a difference in alcohol sales during the pandemic. First we will prepare each treatment data: pre-pandemic (2017, 2018, and 2019) and during-pandemic (2020, 2021, and 2022). Three years are selected.
 
 ```{r}
 #| label: data_for_best_test
@@ -843,31 +843,32 @@ during_covid_data <- sales_in_covid_times %>%
   filter(year %in% c(2020, 2021, 2022)) # Now we have 36 months of aggregated data to compare
 ```
 
-In order to investigate whether there was a change in alcohol sales as a result of the COVID-19 pandemic, we will be using a statistical technique developed by psychologist John K. Kruschke [-@Kruschke2013], who is known for the book of the puppies (Doing Bayesian Data Analysis). This technique is called "Bayesian Estimation Supersedes the t-Test," BEST for short.
+In order to investigate whether there was a change in alcohol sales as a result of the COVID-19 pandemic, we will be using a statistical technique developed by psychologist John K. Kruschke [-@Kruschke2013], who is known for the book of the puppies (Doing Bayesian Data Analysis). This technique is called "Bayesian Estimation Supersedes the t-Test," BEST for short. The mean idea here is to apply inference to the problem of comparing means of two groups.
 
 ![Kruschke's book cover](images/kruschke_puppies.png)
 
 But why should we complicate ourselves with such esoteric approaches? (it is pretty popular, though..).
 
--   First, quantifying uncertainty is crucial when we conduct statistical inference. We want to be sure how much we can doubt in our decisions.
+*   First, quantifying uncertainty is crucial when we conduct statistical inference. We want to be sure whether the observed effects are likely to be due to chance or if they represent actual differences due to an event, in this case, a pandemic. This way, we can measure the amount of "doubt" in our decisions.
 
--   Second, this approach is quite powerful since it allow us to speak in terms of the **magnitude of the effect**, which gives us an idea of how serious the situation is. It also has a beautiful interpretation that facilitates much of the communication of results to the stakeholders.
+*   Second, this approach is quite powerful since it allow us to speak in terms of the **magnitude of the effect**, which gives us an idea of how serious the situation is. It also has a beautiful interpretation that facilitates much of the communication of results to the stakeholders.
 
--   Third, the decision threshold for determining whether there is a difference between the treatment and control groups (such as during a pandemic vs. non-pandemic scenario) is straightforward to communicate and interpret. It's also considered less arbitrary since it requires knowledge of the underlying phenomena.
+*   Third, the decision threshold for determining whether there is a difference between the treatment and control groups (such as during a pandemic vs. non-pandemic scenario) is straightforward to communicate and interpret. It's also considered less arbitrary since it requires knowledge of the underlying phenomena.
 
 For a comprehensive review on the subject, check Kruschke [-@KruschkeLiddell2017]. It is convenient for a data scientist to understand how this technique works, so it is worth taking a couple of hours of your time for this read.
 
-For this test we will need to install the `BEST` library, but it was brought it down from CRAN some time ago. But no worries, you can install it with the following code.
+For this test we will need to install the `BEST` library, but it was brought down from CRAN some time ago. No worries, you can install it with the following code.
 
 ```{r}
 #| label: install_best
 
 # Please uncoment below lines if you want to install it
-# install.packages('HDInterval') # Your system may complain during BEST install if you don have this dependency
+# install.packages('HDInterval') # Your system may complain during BEST install if you don't have this dependency
 # install.packages('https://cran.r-project.org/src/contrib/Archive/BEST/BEST_0.5.4.tar.gz')
 ```
 
-Then we load the library and run the MCMC process to estimate the posteriors.
+This method relies on MCMC to estimate the posterior distribution of the population parameter we are interested in, the monthly mean sales of liquor bottles. So, the first step will be to run the MCMC to get the posterior distributions; we will do this with the function `BESTout`.
+
 
 ```{r}
 #| label: run_mcmc
@@ -877,7 +878,7 @@ BESTout <- BESTmcmc(during_covid_data$bottles_sale_per_million,
                     parallel = FALSE)
 ```
 
-To facilitate the display of the results we will rely in the `plotPost` function from the library.
+We will do our inference with visual aids, but you can explore the object `BESTout` if you are curious since it contains lots of information. In the following chunk, we plot our posteriors. Kruschke's library includes a lot of valuable functions. To get the best charts, we will use `plotPost`.
 
 ```{r}
 #| label: visualize_posteriors
@@ -914,7 +915,9 @@ plotPost(BESTout$mu2,
          ROPEColor = ROPEColor)
 ```
 
-Now we visualize the magnitude of the effect.
+Here, we can appreciate the posterior distribution for our parameters, the mean sales during the pandemic, and the mean sales in a pre-pandemic time. The black bars at the base of the distributions are the highest density intervals (HDI), also called the credible intervals, which are the distribution regions with the most credible values for the parameter. First, we can notice that the estimated distribution for the pandemic parameter is further to the right. At the same time, the pre-pandemic param fell behind, hinting that the average sales during the pandemic were higher. Second, the HDIs do not overlap.
+
+Now we visualize the magnitude of the effect. This is the difference between both distributions.
 
 ```{r}
 #| label: visualize_effect
@@ -933,11 +936,11 @@ plotPost(BESTout$mu1 - BESTout$mu2,
          ROPEColor = ROPEColor)
 ```
 
+The mean difference between `r mean(BESTout$mu1 - BESTout$mu2)`
 Now, let's look how many times the alcohol consumption increased. If you want to learn more about ROPE interpretation and this kind of inference, please revisit [-@Kruschke2018]
 
 ```{r}
 #| label: visualize_proportional_effect
-
 
 plotPost(BESTout$mu1 / BESTout$mu2, 
          xlim = range(BESTout$mu1 / BESTout$mu2),
@@ -950,3 +953,9 @@ plotPost(BESTout$mu1 / BESTout$mu2,
          comparisonColor = comparisonColor, 
          ROPEColor = ROPEColor)
 ```
+
+# Acknowledgements
+
+This small tutorial wouldn't be possible without Little Mai, my home office manager and data science bestie! She's always got my back when my gradients won't converge 💕
+
+![Little Mai](images/mai_stats.jpg)
