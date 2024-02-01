@@ -1,5 +1,5 @@
 ---
-title: "Iowa Liquor Sales Analysis"
+title: "Iowa Liquor Sales: 2.0 You are (Not) in a Pandemic"
 author: 
   name: "Jose P. Barrantes"
   url: "https://www.linkedin.com/in/jose-barrantes/"
@@ -14,15 +14,23 @@ theme:
   dark: darkly
 ---
 
+![](images/eva_tequila.png)
+
 ## About this project
 
-Here we will explore the...
+Here we will explore the the data set "Iowa Liquor Sales" which is freely available. The scope of this analysis is intended [to make an Evangelion reference]{style="text-decoration: line-through;"} as an informal exploration of the data resources of the Iowa Open Data Platform. First, we will conduct a basic data exploration process, and then we will use statistical inferences to answer two specific questions:
+
+1. Can the diversity in our inventory increase the sales of our store?
+
+2. Did the pandemic increased the alcoholic intake of alcohol in the population?
+
+You can take this as a history I tell with the data at hand, but also as a tutorial of the thing that can be done using data. So please do not hesitate in using the code below in your professional/personal projects...
 
 ## About the data set
 
-We will work with the "Iowa Liquor Sales" dataset provided by the Iowa Open Data Platform. This data is constantly updated and licensed under CC, so the use is less restrictive than other kinds of data. This data consist in...
+The data set contains the purchase of spirits with a class "E," which means purchases made by grocery, liquor, and convenience-like stores (also including supermarkets). We will work with the "Iowa Liquor Sales" data set provided by the Iowa Open Data Platform. This data consist mostly in sales, but also includes geo-spatial data, and item descriptions. The data is constantly updated and licensed under CC, so the use is less restrictive than other kinds of data. Some trade-offs are that purchases of beverages like beer, wine, or moonshine are not included, so we do not have a full scope of alcohol consumption.
 
-If you run this analysis I recommend you to use a machine with at least 32 GB of RAM.. due to the size of our main data set...
+If you run this analysis I recommend you to use a machine with at least 32 GB of RAM, since the fresh downloaded data is around 12 GB. No GPU will be needed.
 
 ## Libraries
 
@@ -279,7 +287,9 @@ Please interact with these charts by hovering over the elements.
 
 ## Anomaly detection in time series
 
-As part of our EDA process we can look for anomalies in our time series structure. For this we will use an unsupervised anomaly detection algorithm: the isolation forest algorithm... FALTA...
+We can look for anomalies in our time series structure as part of our EDA process. For this, we will use an unsupervised anomaly detection algorithm: the **isolation forest** algorithm, also known as the **iForest**. This method proposes that the "weirder" values, the easier to separate. So the fewer steps it takes to separate a point from the rest, the more memorable it will be (i.e., an anomaly). The iForest algo is a good choice since it is fast to run, and we have easy-to-use implementations at hand. Here, we will be just algorithm users, but if you want to gain a deeper understanding of this, go for Jason Brownlee's[^1] [tutorial](https://machinelearningmastery.com/anomaly-detection-with-isolation-forest-and-kernel-density-estimation/).
+
+[^1]: I highly recommend following Jason's material if you're pivoting into data science.
 
 Let's prepare our data for the iForest run. We will pull this data directly from our python session
 
@@ -604,7 +614,24 @@ fit_sales_by_diversity_log_summary
 
 The model still explains `r round(fit_sales_by_diversity_log_summary$r.squared, 0)`% of the variability in the data, but with different coefficients. Log-Log regression (log dependent variable, log predictor) has an intuitive interpretation. For every 1% increase in X, there will be a β% increase (or decrease if β is negative) in the dependent variable. In this scenario, β is estimated to be 0.95, this means that a 1% increase in the diversity of products sold in the state of Iowa, will result in a 95% increase in bottle sales. In other words, every time the inventory diversifies by 1%, the number of bottles sold (almost) doubles. However, it's crucial to also consider the cost of logistics, available space on shelves and cellars, and the supply chain.
 
-Now, let's move to a question that to this data science project.
+### Wrapping up our inventory diversity findings
+
+Our results are truly promising, and now is the perfect time to consider a strategic move. Before rushing to present this to decision-makers and ask for a major investment in new products, let's pause for a moment. First, we must acknowledge the complexity of the real world and the possibility that we haven't considered all relevant factors. Second, the extra costs of this move must measured.
+
+Now that we have good evidence at hand, it's time to propose a more measured approach. Imagine you're working for a major retail corporation; you can suggest a pilot program with increased product diversity, perhaps a gourmet drinks aisle in randomly selected stores? This targeted strategy allows us to maintain better control over sales and expenses. It will give us a higher-resolution answer, guiding us to see if the investment is worth it. 
+
+If your experiment is approved, and at the same time, you are a curious person, prepare to delight! During the investigation, more questions will arise, and I recommend you **write them down** as soon they appear:
+
+* Which of the new products are the most liked?
+
+* Does the store's location affect the sales of the more popular items?
+
+* And so on.
+
+After you finish the experiment and present your final results and strategies, take that list, prioritize, and work on your next project. For the prioritizing, I recommend you put the most interesting ones at the top of the list; after all, we're here for fun. If that doesn't get your ideas approved, prioritize the ones with higher revenue-generating potential.
+
+
+Now, let's move to a question that started this data science project.
 
 ## Did the COVID-19 pandemic increase the alcohol consumption of the population?
 
