@@ -4,10 +4,9 @@
 # Here are some utils to download data from the Iowa Open Data portal.
 # Since the data sets can be too big, I have trouble retrieving some of them. it 
 # Hence, I wrote this function to pull the data in batches. 
-# To date, we have a total of 28,176,372 rows in the liquoir sales data set,
+# To date, we have a total of 28,176,372 rows in the liquor sales data set,
 # and this can be problematic for some of us.
-# We use the RSocrata library since it is the tool available to pull the data 
-# from the API, so it is more convenient.
+# We  pull the data iteratively from the API with several GET requests
 # 
 # The data sets can be found in:
 # https://data.iowa.gov/
