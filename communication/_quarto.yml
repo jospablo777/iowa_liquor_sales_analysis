@@ -1,8 +1,10 @@
 project:
   type: website
   output-dir: docs
+
 website:
-  title: TITLE
+  title: "Iowa Liquor Sales: 2.0+1.0 You are (Not) in a Pandemic"
+
 format:
   html:
     theme:
