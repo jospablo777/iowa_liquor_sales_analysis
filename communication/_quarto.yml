@@ -1,6 +1,6 @@
 project:
   type: website
-  output-dir: docs
+  output-dir: ../docs
 
 website:
   title: "Iowa Liquor Sales: 2.0+1.0 You are (Not) in a Pandemic"
