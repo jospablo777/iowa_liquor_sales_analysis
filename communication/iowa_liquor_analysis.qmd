@@ -1,5 +1,5 @@
 ---
-title: "Iowa Liquor Sales: 2.0 You are (Not) in a Pandemic"
+title: "Iowa Liquor Sales: 2.0+1.0 You are (Not) in a Pandemic"
 author: 
   name: "Jose P. Barrantes"
   url: "https://www.linkedin.com/in/jose-barrantes/"
@@ -14,23 +14,23 @@ theme:
   dark: darkly
 ---
 
-![](images/eva_tequila.png)
+![](images/eva_mezcal.png)
 
 ## About this project
 
-Here we will explore the the data set "Iowa Liquor Sales" which is freely available. The scope of this analysis is intended [to make an Evangelion reference]{style="text-decoration: line-through;"} as an informal exploration of the data resources of the Iowa Open Data Platform. First, we will conduct a basic data exploration process, and then we will use statistical inferences to answer two specific questions:
+Here we will explore the the data set "Iowa Liquor Sales" which is freely available. The scope of this analysis is intended [to make an Evangelion reference]{style="text-decoration: line-through;"} as first exploration of the data resources of the Iowa Open Data Platform. First, we will conduct a basic data exploration process, and then we will use statistical inferences to answer two specific questions:
 
 1. Can the diversity in our inventory increase the sales of our store?
 
 2. Did the pandemic increased the alcoholic intake of alcohol in the population?
 
-You can take this as a history I tell with the data at hand, but also as a tutorial of the thing that can be done using data. So please do not hesitate in using the code below in your professional/personal projects...
+You can take this as a history I tell with the data at hand, but also as a tutorial of some things that can be done using time series data. So please do not hesitate in using the code below in your professional/personal projects.  Also, if you have any feedback I will be happy to receive it :)
 
 ## About the data set
 
-The data set contains the purchase of spirits with a class "E," which means purchases made by grocery, liquor, and convenience-like stores (also including supermarkets). We will work with the "Iowa Liquor Sales" data set provided by the Iowa Open Data Platform. This data consist mostly in sales, but also includes geo-spatial data, and item descriptions. The data is constantly updated and licensed under CC, so the use is less restrictive than other kinds of data. Some trade-offs are that purchases of beverages like beer, wine, or moonshine are not included, so we do not have a full scope of alcohol consumption.
+The [data set](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data) we will be using contains information about the purchase of spirits made by grocery, liquor, and convenience stores, including supermarkets. This data is provided by the Iowa Open Data Platform and is constantly updated. It includes item descriptions and geospatial data, and is licensed under Creative Commons, which means that its use is less restrictive than other types of data. However, it's important to note that the data only includes purchases of spirits, and does not include beer, wine, or moonshine purchases. Therefore, we do not have a complete picture of alcohol consumption.
 
-If you run this analysis I recommend you to use a machine with at least 32 GB of RAM, since the fresh downloaded data is around 12 GB. No GPU will be needed.
+If you plan on running an analysis using this dataset, I recommend using a machine with at least 32 GB of RAM, as the data is around 12 GB in size. No GPU will be required for this task.
 
 ## Libraries
 
@@ -57,10 +57,6 @@ library(fabletools)
 library(modeltime)
 library(timetk)
 
-# Geospatial libraries
-library(sf)
-library(viridis) # color palette
-
 # Formatting and communication
 library(rmarkdown)
 library(quartoExtra)
@@ -80,7 +76,7 @@ library(BEST)
 
 ## Get the data, and some performance considerations
 
-Please check utils/get_data.R for more details on the data pull. We will do this only once since, from now on, we will use a local copy of the data for speed issues. You can find the data set page [here](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data). With the function `download_iowa_data`, the data is downloaded in batches since downloading such big data sets can be troublesome or even impossible.
+Please check utils/get_data.R for more details on the data pull. We will do this only once since, from now on, there will be a local copy of the data to speed our affairs. You can find the data set page [here](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data). With the function `download_iowa_data`, the data will be downloaded in **batches** since downloading such big data sets can be troublesome or even impossible.
 
 There is also another function, `read_iowa_data`, to read the batches into a single data frame. Since I worked for several days developing this analysis, I also saved a copy of the data in a `.feather` file to speed up things whenever I needed to load it.
 
@@ -126,28 +122,6 @@ iowa_population <- read_csv('../data/iowa_population.csv') %>%
 
 In the past snippet, we added an extra variable, `pop_100k`, the population of 100k inhabitants. Later, we will also get more data.
 
-Let's create new variables to enrich our data set, `liquor_type` indicates the type of liquor purchased in every receipt.
-
-```{r}
-#| label: add_liquor_type
-
-# Add the type of spirit/drink
-iowa_liquor_data <- iowa_liquor_data %>% 
-  mutate(
-    liquor_type = case_when(
-      grepl('VODK', category_name)  ~ 'VODKA',
-      grepl('WHISK', category_name)  ~ 'WHISKY',
-      grepl('RUM', category_name)  ~ 'RUM',
-      grepl('SCHN', category_name)  ~ 'SCHNAPPS',
-      grepl('TEQ', category_name)  ~ 'TEQUILA',
-      grepl('BRANDIE', category_name) | grepl('BRANDY', category_name) ~ 'BRANDY',
-      grepl('GIN', category_name)  ~ 'GIN',
-      grepl('MEZC', category_name)  ~ 'MEZCAL',
-      grepl('CREM', category_name) | grepl('CREAM', category_name) ~ 'CREAM',
-      .default = 'OTHER'
-      )
-    )
-```
 
 # Exploratory Data Analysis (EDA)
 
@@ -167,7 +141,7 @@ time_span
 
 So we have `r round(time_span, 1)` years of data, that's a lot!
 
-Next, are there any duplicated values in our data frame? Since our data set is too big, we cannot use duplicated() performantly, so let's check by the invoice number.
+Next, are there any duplicated values in our data frame? Since the data set is too big, we cannot use `duplicated` performantly, so let's check by the invoice number.
 
 ```{r}
 #| label: duplicates_in_data
@@ -177,7 +151,7 @@ n_distinct(iowa_liquor_data$invoice_line_no) == nrow(iowa_liquor_data)
 
 An equal number of rows and distinct invoice IDs mean that every invoice differs. So, no duplicates were found :)
 
-How many locations are missing? This is important since we will do some geospatial analysis later.
+How many locations are missing? This is important since we will do some geospatial analysis later tutorials.
 
 ```{r}
 #| label: n_missing_locations
@@ -186,7 +160,7 @@ missing_location <- sum(is.na(iowa_liquor_data$store_location))
 format(missing_location, big.mark=",")
 ```
 
-Around `r round(missing_location/1e6, 2)` M of invoices do not have location. Later we will deal with this issue.
+The `county_number` and `store_location` are the variables with the most missing values. Around `r round(missing_location/1e6, 2)` M of invoices do not have location. Later we will deal with this issue, in the next analysis.
 
 ```{r}
 #| label: n_no_location_stores
@@ -210,7 +184,7 @@ missing_per_column <- colSums(is.na(iowa_liquor_data)) %>%
   as.list() %>% 
   as_tibble() %>% 
   pivot_longer(all_of(colnames(iowa_liquor_data))) %>% 
-  rename(variable=name, missing=value) %>% 
+  rename(variable = name, missing=value) %>% 
   arrange(desc(missing)) # We present first the variables with more NAs
 
 paged_table(missing_per_column) 
@@ -223,6 +197,9 @@ We have three missing item IDs, but the sales fields have no missing values, whi
 Prepare the data first.
 
 ```{r}
+#| label: first_ts_dataset
+#| output: false
+
 consumption_day_summary <- iowa_liquor_data %>% 
   group_by(day = floor_date(date, unit = "day")) %>% 
   summarise(n_invoices = n(),
@@ -245,34 +222,34 @@ First impression of our daily data.
 #| column: screen-inset-shaded
 
 consumption_time_series_day_plot <- 
-  ggplot(consumption_day_summary, aes(x=as.Date(day), y=n_bottles)) + # , color='trick_line_col'
-  geom_line(color="#8d8d8d") + 
+  ggplot(consumption_day_summary, aes(x = as.Date(day), y = n_bottles)) + # , color='trick_line_col'
+  geom_line(color = "#8d8d8d") + 
   theme(legend.position = "none") +
-  labs(x='Date', y = 'Sold bottles')
+  labs(x = 'Date', y = 'Sold bottles')
 
 consumption_time_series_day_plot  
 ```
 
-It seems that there are a lot of purchases near to zero. Could all the liquor stores agree to not purchase in certain days occasions? Let's re-check considering the week days in the chart.
+It seems that there are a lot of purchases near to zero. Could all the liquor stores agree to not purchase in certain days? Let's re-check considering the week days in the chart.
 
 ```{r}
 #| classes: dark-light
 #| column: screen-inset-shaded
 #| 
 consumption_time_series_day_plot <- 
-  ggplot(consumption_day_summary, aes(x=as.Date(day), y=n_bottles)) + 
-  geom_line(color="#8d8d8d") + 
-  geom_point(aes(color=as.factor(week_day))) +
-  labs(x='Date', y = 'Sold bottles', color="Day of the week")
+  ggplot(consumption_day_summary, aes(x = as.Date(day), y = n_bottles)) + 
+  geom_line(color = "#8d8d8d") + 
+  geom_point(aes(color = as.factor(week_day))) +
+  labs(x = 'Date', y = 'Sold bottles', color = "Day of the week")
 
 consumption_time_series_day_plot
 ```
 
-Fridays, Saturdays, and Sundays are the days with fewer purchases. Indeed, the stores do not receive or make orders on weekends.
+Fridays, Saturdays, and Sundays are the days with fewer purchases. Indeed, the stores do not put orders on weekends (most of the times).
 
 Now, let's explore the calendar effect in our time series data. Here, we will gain a general notion of how the human cycles surrounding the calendar (such as weekends and holidays) affect liquor sales. This will be very easy with the library `timetk` by Matt Dancho. The function `plot_seasonal_diagnostics`, creates the relevant plots for this analysis.
 
-```{r}
+```{r, out.height=700}
 #| label: calendar_effect
 
 consumption_day_summary %>% 
@@ -283,11 +260,11 @@ consumption_day_summary %>%
   timetk::plot_seasonal_diagnostics(day_, n_bottles)
 ```
 
-Please interact with these charts by hovering over the elements.
+Please interact with these charts by hovering over the elements. First, we can notice that the stores avoid making purchases on weekends. Then we see that October and December are the months with the most purchases in the year, the same for the last quarter of the year. And finally, it seems that 2013 and 2020 were good years.
 
 ## Anomaly detection in time series
 
-We can look for anomalies in our time series structure as part of our EDA process. For this, we will use an unsupervised anomaly detection algorithm: the **isolation forest** algorithm, also known as the **iForest**. This method proposes that the "weirder" values, the easier to separate. So the fewer steps it takes to separate a point from the rest, the more memorable it will be (i.e., an anomaly). The iForest algo is a good choice since it is fast to run, and we have easy-to-use implementations at hand. Here, we will be just algorithm users, but if you want to gain a deeper understanding of this, go for Jason Brownlee's[^1] [tutorial](https://machinelearningmastery.com/anomaly-detection-with-isolation-forest-and-kernel-density-estimation/).
+We can look for anomalies in our time series structure as part of our EDA process. For this, we will use an unsupervised anomaly detection algorithm: the **isolation forest** algorithm, also known as the **iForest**. This method proposes that the "weirder" values are, the easier to separate. So the fewer steps it takes to separate a point from the rest, the more memorable it will be (i.e., an anomaly). The iForest algo is a good choice since it is fast to run, and we have easy-to-use implementations at hand. Here, we will be just algorithm users, but if you want to gain a deeper understanding of this, go for Jason Brownlee's[^1] [tutorial](https://machinelearningmastery.com/anomaly-detection-with-isolation-forest-and-kernel-density-estimation/).
 
 [^1]: I highly recommend following Jason's material if you're pivoting into data science.
 
@@ -300,7 +277,7 @@ data_iforest <- consumption_day_summary %>%
   mutate(month = month(day, abbr = FALSE, label=TRUE)) # the month will also be a feature
 ```
 
-Please note that the code below is written in Python. We can leverage the cool stuff in the Python community by utilizing the `reticulate` R library. Then, in our Python environment, we can use the PyCaret library, which is an top library for running complex machine learning workflows with minimal code. This saves us a lot of time, so we can focus on what is happening with the liquor sales. The code shown below has been modified from Moez Ali's [tutorial](https://pycaret.gitbook.io/docs/learn-pycaret/official-blog/time-series-anomaly-detection-with-pycaret).
+Please note that the code below is written in Python. We can leverage the cool stuff in the Python community by utilizing the `reticulate` R library. Then, in our Python environment, we can use the PyCaret library, which is an amazing library for running complex machine learning workflows with minimal code. This saves us a lot of time, so we can focus on what is happening with the liquor sales. The code shown below has been modified from Moez Ali's [tutorial](https://pycaret.gitbook.io/docs/learn-pycaret/official-blog/time-series-anomaly-detection-with-pycaret).
 
 ```{python}
 #| label: iforest_run
@@ -365,7 +342,7 @@ anomalies_over_p50_bottles <- iforest_results %>%
   # Added some extra variables
   mutate(month_number     = month(day),
          month_day_number = mday(day) + rnorm(n(), sd=0.3), # Added some Gaussian noise to the day number to appreciate in the plot the holidays that overlap every year
-         year_day_number  = yday(day))
+         year_day_number  = yday(day)) 
 
 # Get some holidays
 daynumber_by_month_holidays <- holidays %>% 
@@ -378,11 +355,13 @@ daynumber_by_month_holidays <- holidays %>%
 
 ```
 
+With the above data, we will plot the top outliers alongside the booziest days in the United States, based on information from alcohol.com.
+
 ```{r}
 #| label: anomalies_first_scatter_plot
 #| classes: dark-light
 #| column: screen-inset-shaded
-#| 
+
 daynumber_by_month <- ggplot(anomalies_over_p50_bottles, aes(x=month_day_number, y=month_number)) +
   geom_point(color="#8d8d8d") +
   geom_point(data=daynumber_by_month_holidays, aes(x=mean_day, y=mean_month), size=7, color='#58bbc3', alpha=0.5) +
@@ -393,6 +372,8 @@ daynumber_by_month <- ggplot(anomalies_over_p50_bottles, aes(x=month_day_number,
 daynumber_by_month
 ```
 
+It's interesting to note that while some outliers cluster around certain holidays, none are from St. Patrick's Day even though outliers exist for other holidays like *Cinco de Mayo*.
+
 We can also check how these anomalies (the ones above quantile 50%) distribute across the year.
 
 ```{r}
@@ -400,12 +381,13 @@ We can also check how these anomalies (the ones above quantile 50%) distribute a
 #| classes: dark-light
 #| column: screen-inset-shaded
 
-ggplot(anomalies_over_p50_bottles, aes(x=year_day_number)) +
-  geom_density(color="darkblue", fill="lightblue") +
+ggplot(anomalies_over_p50_bottles, aes(x = year_day_number)) +
+  geom_density(color = "darkblue", fill = "lightblue", alpha = 0.7) +
   labs(x='Year day number', y = 'Density') 
 ```
 
-It is clear the more heavy drinking days of the year are concentrated at the end of the year
+It is clear the heaviest drinking days of the year are concentrated at the end of the year.
+
 
 ## Exploring time series composition
 
@@ -413,26 +395,29 @@ To extract more insights from our time series data, it's useful to break it down
 
 STL is a great choice as it can detect various types of seasonality and can be tailored to specific needs. Moreover, it's a reliable method that generally delivers accurate results. You can find more information about STL in the book ["Forecasting: Principles and Practice"](https://otexts.com/fpp3/) by Hyndman and Athanasopoulos [-@Hyndman2021].
 
-```{r, out.height="130%"}
+```{r, out.height=600}
 #| label: first_ts_composition_plot
 #| classes: dark-light
 #| column: screen-inset-shaded
 
 consumption_day_summary %>% 
   select(day, n_bottles) %>% 
-  mutate(day=ymd(day)) %>% 
-  as_tsibble(index=day) %>%
+  mutate(day = ymd(day)) %>% 
+  as_tsibble(index = day) %>%
   fill_gaps(n_bottles = 0) %>% # We will assume that for the days with no data are because not purchases occurred, which have sense since most of them are on weekends (i.e. lot of people don't work)
   model(stl = STL(n_bottles)) %>% 
   components() %>% 
-  autoplot(color='#8d8d8d') 
+  autoplot(color = '#8d8d8d') 
 ```
 
-We are presented with four charts in this visualization, the first one is our time serie, then, it is followed by its components:
+We are presented with four charts in this visualization; the first one is our time series, which is followed by its components:
 
--   The trend in liquor sales over through time
+* The trend in liquor sales over time
+* The seasonal pattern through the years
+* The seasonal pattern through the weeks
+* The remainder, which is the variability that cannot be explained. Also known as noise.
 
-The above is a lot of information, let's aggregate the info in months to analyze the chart with less granularity.
+The above chart has a lot of information. Let's aggregate the info in months to analyze the chart with less granularity.
 
 ```{r}
 #| label: time_series_comp_data_set
@@ -457,22 +442,24 @@ consumption_month_decomposition %>%
   ggplotly()
 ```
 
-This chart is **interactive**. Please hover over the parts that catches your attention. The seasonal behavior of alcohol consumption is interesting throughout the year (`season_year` tile). We notice three peaks, the first one being in June (which is relatively modest), the second in October, and the third in December. Also, we observe an increasing trend in the acquisition of alcohol by stores, which could be due to an increase in the population, as indicated by the following chart. Data obtained from [datacommons.org](https://datacommons.org/place/geoId/19?utm_medium=explore&mprop=count&popt=Person&hl=en).
+
+This chart is **interactive**. Please hover over the parts that catches your attention. The seasonal behavior of alcohol consumption is interesting throughout the year (`season_year` tile). We notice three peaks in the year seasonality, the first one being in June (which is relatively modest), the second in October, and the third in December. Also, we observe an increasing trend in the acquisition of alcohol by stores, which could be due to an increase in the population, as indicated by the following chart. Data obtained from [datacommons.org](https://datacommons.org/place/geoId/19?utm_medium=explore&mprop=count&popt=Person&hl=en).
 
 ```{r}
 #| label: population_growth_plot
 #| classes: dark-light
-#| column: screen-inset-shaded
 
 # Estimated population of Iowa since 2012
 ggplot(iowa_population, aes(x=Year, y=Population/1e6)) +
   geom_point(color = '#8d8d8d') +
-  geom_smooth(method = lm, se = FALSE, color = '#696969') +
+  geom_smooth(method = lm, formula = y ~ x, se = FALSE, color = '#696969') +
   labs(x = "Year", y = "Population in Millions")
 
 ```
 
-Over the past 12 years, the population has increased. However, could offering a wider variety of products increase liquor sales? Would appeal to diverse tastes impact the amount of alcohol sold?
+Over the past 12 years, the population has increased. However, could offering a wider variety of products increase liquor sales? Would appeal to diverse tastes impact the amount of alcohol sold? 
+
+Shall we examine how the variety of alcoholic beverages has expanded throughout the years?
 
 ```{r}
 #| label: product_diversity_decomp_plot
@@ -488,9 +475,11 @@ iowa_liquor_data %>%
   ggplotly()
 ```
 
-Ulalà... look at this beauty! It seems like every year more and more products are being introduced to the market. Another interesting observation is that there is always a rise in the variety of available products during October. Is this because of the upcoming year-end celebrations or the introduction of autumn flavors such as pumpkin spice? Could it be that stores are promoting new products to potential customers as a way to encourage sales towards the end of the year?
+Ulalà... look at this beauty! It seems like every year more and more products are being introduced to the market. Another interesting observation is that there is always a rise in the variety of available products during October, please hover over the `season_year` row. Is this because of the upcoming year-end celebrations or the introduction of autumn flavors such as pumpkin spice? Could it be that stores are promoting new products to potential customers as a way to encourage sales towards the end of the year?
 
-Yes, the variety of alcoholic beverages available in the market has increased, which means that there are more options to cater to different tastes. For example, some people may not like raspberry vodka but might prefer tamarind Smirnoff, or they may enjoy the one that comes in a bottle with a skull design. Having more options ensures that everyone can find a drink that they like.
+Yes, the variety of alcoholic beverages available in the market has increased over time, which means that there are more options to cater to different tastes. For example, some people may not like raspberry vodka but might prefer tamarind Smirnoff, or they could enjoy the one that comes in a bottle with a skull design. Having more options ensures that everyone can find a drink that they like.
+
+![Photograph by Dustintitus, distributed under a CC-BY 4.0 license.](images/CHV_Original.tif.jpg)
 
 ## Determining the effect of diversity in inventory over sales
 
@@ -498,7 +487,7 @@ We noticed a sales increase in bottles over time. Is the rise merely due to popu
 
 Our plan is to investigate whether the number of diverse products in the market is a reliable indicator of sales volume. It's important to note that diversity encompasses not only different flavors, but also various sizes and presentations. For instance, a smaller bottle of the same rum or a special edition of your favorite brand with collectible shot glasses.
 
-Now that we know that the population of Iowas has been increasing and that it could be a potential **confounder** when we try to estimate the effect of the diversity of products, we should consider it. To begin with, we must adjust the sales figures based on the population data (i.e., normalize).
+Now that we know that the population of Iowas has been increasing and that it could be a potential **confounder** when we try to estimate the effect of the diversity of products, we should consider it. To begin with, we must adjust the sales figures based on the population data (i.e., normalize by the current population in a given time).
 
 ```{r}
 #| label: sale_by_diversity_dataset
@@ -510,15 +499,18 @@ sale_by_diversity <- iowa_liquor_data %>%
   mutate(year = year(month)) %>% 
   left_join(iowa_population, by = c("year"="Year")) %>% # integrate with Iowa population data
   mutate(population_millions = Population/1e6, # a variable for the population in Millions
-         bottles_per_million_inhabitants = sale_bottles/population_millions) %>% # sales of bottles per million inhabitants 
+         bottles_per_million_inhabitants = sale_bottles/population_millions) %>% # sales of bottles per million inhabitants
   summarise(n_different_products     = n_distinct(itemno),
             bottles_sale_per_million = sum(bottles_per_million_inhabitants)) 
 ```
 
-It is advisable to avoid using `sale_dollars` as inflation could act as a confounder. To include dollars, we should adjust for inflation and remove its effect.
+**Pro-tip:** avoid using `sale_dollars` as inflation could act as a confounder. To include dollars, we should adjust for inflation and remove its effect. We won't do that here.
+
+Let's visualize the our data.
 
 ```{r}
 #| label: inventory_diversity_vs_sales
+#| output: false
 #| classes: dark-light
 #| column: screen-inset-shaded
 
@@ -528,7 +520,7 @@ ggplot(sale_by_diversity, aes(x = n_different_products, y = bottles_sale_per_mil
   labs(x = "Different products available", y = "Bottles sold per million inhabitants")
 ```
 
-Very nice! It seems that the diversity of products is a good predictor. Now, we can get more numerical info from this if we run a linear model.
+Very nice! It seems that the diversity of products is a good predictor. We can get more numerical info from this if we run a linear model. We will regress bottle sales on the number of different products, so, in other words, we will try to predict the number of bottles sold by using the diversity in our inventory.
 
 ```{r}
 #| label: fit_sales_by_diversity
@@ -623,12 +615,10 @@ Now that we have good evidence at hand, it's time to propose a more measured app
 If your experiment is approved, and at the same time, you are a curious person, prepare to delight! During the investigation, more questions will arise, and I recommend you **write them down** as soon they appear:
 
 * Which of the new products are the most liked?
-
 * Does the store's location affect the sales of the more popular items?
-
 * And so on.
 
-After you finish the experiment and present your final results and strategies, take that list, prioritize, and work on your next project. For the prioritizing, I recommend you put the most interesting ones at the top of the list; after all, we're here for fun. If that doesn't get your ideas approved, prioritize the ones with higher revenue-generating potential.
+After you finish the experiment and present your final results and strategies, take that list, prioritize, and work on your next project. For the prioritizing, I recommend you put the most interesting ones at the top of the list; after all, we're here for fun. If that doesn't get your ideas approved, prioritize the ones with higher revenue-generating potential, that should do the trick.
 
 
 Now, let's move to a question that started this data science project.
