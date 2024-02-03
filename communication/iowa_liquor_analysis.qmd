@@ -4,7 +4,9 @@ author:
   name: "Jose P. Barrantes"
   url: "https://www.linkedin.com/in/jose-barrantes/"
 bibliography: references.bib
-format: html
+format: 
+  html:
+    toc: true
 knitr:
   opts_chunk:
     out.width: "100%"
@@ -20,11 +22,11 @@ theme:
 
 Here we will explore the the data set "Iowa Liquor Sales" which is freely available. The scope of this analysis is intended [to make an Evangelion reference]{style="text-decoration: line-through;"} as first exploration of the data resources of the Iowa Open Data Platform. First, we will conduct a basic data exploration process, and then we will use statistical inferences to answer two specific questions:
 
-1. Can the diversity in our inventory increase the sales of our store?
+1.  Can the diversity in our inventory increase the sales of our store?
 
-2. Did the pandemic increased the alcoholic intake of alcohol in the population?
+2.  Did the pandemic increased the alcoholic intake of alcohol in the population?
 
-You can take this as a history I tell with the data at hand, but also as a tutorial of some things that can be done using time series data. So please do not hesitate in using the code below in your professional/personal projects.  Also, if you have any feedback I will be happy to receive it :)
+You can take this as a history I tell with the data at hand, but also as a tutorial of some things that can be done using time series data. So please do not hesitate in using the code below in your professional/personal projects. Also, if you have any feedback I will be happy to receive it :)
 
 ## About the data set
 
@@ -45,7 +47,7 @@ library(tidyverse)
 library(feather)
 library(plotly)
 library(reticulate)
-source('../utils/get_data.R')
+library(iodDownloader)
 source('../utils/data_processing.R')
 
 # Time series libraries
@@ -76,7 +78,17 @@ library(BEST)
 
 ## Get the data, and some performance considerations
 
-Please check utils/get_data.R for more details on the data pull. We will do this only once since, from now on, there will be a local copy of the data to speed our affairs. You can find the data set page [here](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data). With the function `download_iowa_data`, the data will be downloaded in **batches** since downloading such big data sets can be troublesome or even impossible.
+I've written an R package to facilitate the download from the Iowa Open Data Portal; Please check [iodDownloader GitHub page](https://github.com/jospablo777/iodDownloader) for more details on the data pull. The package can be installed with:
+
+```{r}
+#| label: install_iodDownloader
+
+# Uncomment below lines if you want to install iodDownloader
+# install.packages("devtools")
+# devtools::install_github("jospablo777/iodDownloader")
+```
+
+We will download the data only once since, from now on, there will be a local copy of the data to speed our affairs. You can find the data set page [here](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data). With the function `download_iowa_data`, the data will be downloaded in **batches** since downloading such big data sets can be troublesome or even impossible.
 
 There is also another function, `read_iowa_data`, to read the batches into a single data frame. Since I worked for several days developing this analysis, I also saved a copy of the data in a `.feather` file to speed up things whenever I needed to load it.
 
@@ -89,7 +101,7 @@ download_iowa_data(data_id       = 'm3tr-qhgy',
                    folder        = '../data',
                    data_name     = 'iowa_liquor_data',
                    total_of_rows = 29000000, # To the date, we have 28,176,372 rows in this data set
-                   batch_size    = 1000000)
+                   batch_size    = 1000000)  # Batches of 1M
 
 # Read locally saved data
 iowa_liquor_data <- read_iowa_data(folder_path='../data', data_name='iowa_liquor_data') # call once
@@ -121,7 +133,6 @@ iowa_population <- read_csv('../data/iowa_population.csv') %>%
 ```
 
 In the past snippet, we added an extra variable, `pop_100k`, the population of 100k inhabitants. Later, we will also get more data.
-
 
 # Exploratory Data Analysis (EDA)
 
@@ -388,7 +399,6 @@ ggplot(anomalies_over_p50_bottles, aes(x = year_day_number)) +
 
 It is clear the heaviest drinking days of the year are concentrated at the end of the year.
 
-
 ## Exploring time series composition
 
 To extract more insights from our time series data, it's useful to break it down into its three main components: trend, season, and the remainder. To do this, we'll use the STL decomposition method, which stands for Seasonal and Trend decomposition using Loess.
@@ -412,10 +422,10 @@ consumption_day_summary %>%
 
 We are presented with four charts in this visualization; the first one is our time series, which is followed by its components:
 
-* The trend in liquor sales over time
-* The seasonal pattern through the years
-* The seasonal pattern through the weeks
-* The remainder, which is the variability that cannot be explained. Also known as noise.
+-   The trend in liquor sales over time
+-   The seasonal pattern through the years
+-   The seasonal pattern through the weeks
+-   The remainder, which is the variability that cannot be explained. Also known as noise.
 
 The above chart has a lot of information. Let's aggregate the info in months to analyze the chart with less granularity.
 
@@ -442,7 +452,6 @@ consumption_month_decomposition %>%
   ggplotly()
 ```
 
-
 This chart is **interactive**. Please hover over the parts that catches your attention. The seasonal behavior of alcohol consumption is interesting throughout the year (`season_year` tile). We notice three peaks in the year seasonality, the first one being in June (which is relatively modest), the second in October, and the third in December. Also, we observe an increasing trend in the acquisition of alcohol by stores, which could be due to an increase in the population, as indicated by the following chart. Data obtained from [datacommons.org](https://datacommons.org/place/geoId/19?utm_medium=explore&mprop=count&popt=Person&hl=en).
 
 ```{r}
@@ -457,7 +466,7 @@ ggplot(iowa_population, aes(x=Year, y=Population/1e6)) +
 
 ```
 
-Over the past 12 years, the population has increased. However, could offering a wider variety of products increase liquor sales? Would appeal to diverse tastes impact the amount of alcohol sold? 
+Over the past 12 years, the population has increased. However, could offering a wider variety of products increase liquor sales? Would appeal to diverse tastes impact the amount of alcohol sold?
 
 Shall we examine how the variety of alcoholic beverages has expanded throughout the years?
 
@@ -479,13 +488,13 @@ Ulalà... look at this beauty! It seems like every year more and more products a
 
 Yes, the variety of alcoholic beverages available in the market has increased over time, which means that there are more options to cater to different tastes. For example, some people may not like raspberry vodka but might prefer tamarind Smirnoff, or they could enjoy the one that comes in a bottle with a skull design. Having more options ensures that everyone can find a drink that they like.
 
-![Photograph by Dustintitus, distributed under a CC-BY 4.0 license.](images/CHV_Original.tif.jpg)
+![Crystal Head Vodka. Photograph by Dustintitus, distributed under a CC-BY 4.0 license.](images/CHV_Original.tif.jpg)
 
 ## Determining the effect of diversity in inventory over sales
 
 We noticed a sales increase in bottles over time. Is the rise merely due to population growth, or does the market offer play a role? Let's find out!
 
-Our plan is to investigate whether the number of diverse products in the market is a reliable indicator of sales volume. It's important to note that diversity encompasses not only different flavors, but also various sizes and presentations. For instance, a smaller bottle of the same rum or a special edition of your favorite brand with collectible shot glasses.
+Our next step is to investigate whether the number of diverse products in the market is a reliable indicator of sales. It's important to note that diversity encompasses not only different flavors, but also various sizes and presentations. For instance, a smaller bottle of the same rum, or a special edition of your favorite tequila brand with collectible shot glasses.
 
 Now that we know that the population of Iowas has been increasing and that it could be a potential **confounder** when we try to estimate the effect of the diversity of products, we should consider it. To begin with, we must adjust the sales figures based on the population data (i.e., normalize by the current population in a given time).
 
@@ -497,26 +506,26 @@ sale_by_diversity <- iowa_liquor_data %>%
   select(date, itemno, sale_bottles) %>% 
   group_by(month = yearmonth(date)) %>%   # We will explore monthly data in our (available) history
   mutate(year = year(month)) %>% 
-  left_join(iowa_population, by = c("year"="Year")) %>% # integrate with Iowa population data
-  mutate(population_millions = Population/1e6, # a variable for the population in Millions
-         bottles_per_million_inhabitants = sale_bottles/population_millions) %>% # sales of bottles per million inhabitants
+  left_join(iowa_population, by = c("year"="Year")) %>% # Integrate with Iowa population data
+  mutate(population_millions = Population/1e6,          # A variable for the population in Millions
+         bottles_per_million_inhabitants = sale_bottles/population_millions,
+         bottles_per_capita = sale_bottles/Population) %>% # Sales of bottles per million inhabitants
   summarise(n_different_products     = n_distinct(itemno),
-            bottles_sale_per_million = sum(bottles_per_million_inhabitants)) 
+            bottles_sale_per_million = sum(bottles_per_million_inhabitants),
+            bottles_sale_per_capita  = sum(bottles_per_capita)) 
 ```
 
 **Pro-tip:** avoid using `sale_dollars` as inflation could act as a confounder. To include dollars, we should adjust for inflation and remove its effect. We won't do that here.
 
-Let's visualize the our data.
+Let's visualize the data.
 
 ```{r}
 #| label: inventory_diversity_vs_sales
-#| output: false
 #| classes: dark-light
-#| column: screen-inset-shaded
 
 ggplot(sale_by_diversity, aes(x = n_different_products, y = bottles_sale_per_million)) + 
   geom_point(color = '#8d8d8d') +
-  geom_smooth(method = lm, se = FALSE, color = '#696969') +
+  geom_smooth(method = lm, formula = y ~ x, se = FALSE, color = '#696969') +
   labs(x = "Different products available", y = "Bottles sold per million inhabitants")
 ```
 
@@ -552,13 +561,13 @@ fit_sales_by_diversity_summary <- summary(fit_sales_by_diversity)
 fit_sales_by_diversity_summary 
 ```
 
-First, we can observe in the R-squared that the model can explain `r round(fit_sales_by_diversity_summary$r.squared * 100, 0)`% of our data variability, i.e., the diversity in alcoholic products is a good predictor over all liquor sale in Iowa. Second, we can observe that the estimate for the variable `n_different_products` is 263. We interpret this as follows: with the release of each new product in the market, the monthly (alcohol) sales in Iowa will increase in 263 bottles, per million of inhabitants, in the State of Iowa.
+First, we can observe in the R^2^ that the model can explain `r round(fit_sales_by_diversity_summary$r.squared * 100, 0)`% of our data variability, i.e., the diversity in alcoholic products is a good predictor over all liquor sale in Iowa. Second, we can observe that the estimate for the variable `n_different_products` is 263. We interpret this as follows: with the release of each new product in the market, the monthly (alcohol) sales will increase in 263 bottles, per million of inhabitants, in the State of Iowa.
 
 ### But how to present this information to non-technical people?
 
 Imagine that you work for a **liquor distributor** and are presenting your findings to the top executives. Firstly, the phrase "will increase in 263 bottles per million inhabitants" is fairly complex. Therefore, and assuming you are in the year 2027 and you know that the population is approximately 3.8 million, you could say something simpler, such as:
 
-> *"For every new product, or new presentation of our old product, we launch in Iowa, we will sell around 1000 (i.e., `263.45x3.8`) units monthly"*
+> *"For every new product, or new presentation of our old product, we launch in Iowa, we will sell around 1000 (i.e., `263.45×3.8`) extra units monthly"*
 
 Notice that we say "around 1000" to facilitate the digestion of the info. Round numbers decrease the [cognitive load](https://en.wikipedia.org/wiki/Cognitive_load), are easy to remember, and will be easier to assimilate them by your audience. Of course it is not that simple, if the product is well liked by the population it will sell even more, but if it sucks it wont sell. Also, having more products in the inventory could increase costs in logistics, marketing, and so on.
 
@@ -575,11 +584,10 @@ We will run almost the same model, just with a little difference. Our variables 
 ```{r}
 #| label: log_transformed_fit_plot
 #| classes: dark-light
-#| column: screen-inset-shaded
 
 ggplot(sale_by_diversity, aes(x=log(n_different_products), y=log(bottles_sale_per_million))) + 
   geom_point(color = '#8d8d8d') +
-  geom_smooth(method = lm, se = FALSE, color = '#696969') +
+  geom_smooth(method = lm, formula = y ~ x, se = FALSE, color = '#696969') +
   labs(x = "Log(Number of different products)", y = "Log(Bottles sold per million inhabitants)")
 ```
 
@@ -604,28 +612,27 @@ fit_sales_by_diversity_log_summary <- summary(fit_sales_by_diversity_log)
 fit_sales_by_diversity_log_summary
 ```
 
-The model still explains `r round(fit_sales_by_diversity_log_summary$r.squared, 0)`% of the variability in the data, but with different coefficients. Log-Log regression (log dependent variable, log predictor) has an intuitive interpretation. For every 1% increase in X, there will be a β% increase (or decrease if β is negative) in the dependent variable. In this scenario, β is estimated to be 0.95, this means that a 1% increase in the diversity of products sold in the state of Iowa, will result in a 95% increase in bottle sales. In other words, every time the inventory diversifies by 1%, the number of bottles sold (almost) doubles. However, it's crucial to also consider the cost of logistics, available space on shelves and cellars, and the supply chain.
+The model still explains around `r round(fit_sales_by_diversity_log_summary$r.squared * 100, 0)`% of the variability in the data, but with different coefficients. Log-Log regression (log dependent variable, log predictor) has an intuitive interpretation. For every 1% increase in X, there will be a β% increase (or decrease if β is negative) in the dependent variable (Y). In this scenario, β is estimated to be 0.95, this means that a 1% increase in the diversity of products sold in the state of Iowa, will result in a 95% increase in bottle sales. In other words, every time the inventory diversifies by 1%, the number of bottles sold will (almost) double. However, it's crucial to also consider the cost of logistics, available space on shelves and cellars, and the supply chain.
 
 ### Wrapping up our inventory diversity findings
 
 Our results are truly promising, and now is the perfect time to consider a strategic move. Before rushing to present this to decision-makers and ask for a major investment in new products, let's pause for a moment. First, we must acknowledge the complexity of the real world and the possibility that we haven't considered all relevant factors. Second, the extra costs of this move must measured.
 
-Now that we have good evidence at hand, it's time to propose a more measured approach. Imagine you're working for a major retail corporation; you can suggest a pilot program with increased product diversity, perhaps a gourmet drinks aisle in randomly selected stores? This targeted strategy allows us to maintain better control over sales and expenses. It will give us a higher-resolution answer, guiding us to see if the investment is worth it. 
+Now that we have good evidence at hand, it's time to propose a more measured approach. Imagine you're working for a major retail corporation; you can suggest a pilot program with increased product diversity, perhaps a gourmet drinks aisle in randomly selected stores? This targeted strategy allows us to maintain better control over sales and expenses. It will give us a higher-resolution answer, guiding us to see if the investment is worth it.
 
 If your experiment is approved, and at the same time, you are a curious person, prepare to delight! During the investigation, more questions will arise, and I recommend you **write them down** as soon they appear:
 
-* Which of the new products are the most liked?
-* Does the store's location affect the sales of the more popular items?
-* And so on.
+-   Which of the new products are the most liked?
+-   Does the store's location affect the sales of the more popular items?
+-   And so on.
 
 After you finish the experiment and present your final results and strategies, take that list, prioritize, and work on your next project. For the prioritizing, I recommend you put the most interesting ones at the top of the list; after all, we're here for fun. If that doesn't get your ideas approved, prioritize the ones with higher revenue-generating potential, that should do the trick.
-
 
 Now, let's move to a question that started this data science project.
 
 ## Did the COVID-19 pandemic increase the alcohol consumption of the population?
 
-There is a great [Wikipedia page](https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa) that summarizes the history line of COVID-19 in Iowa. This is a great resource! We can extract some valuable information for our analysis from there. This info will be in the `iowa_first_covid_events` data set.
+There is a great [Wikipedia page](https://en.wikipedia.org/wiki/COVID-19_pandemic_in_Iowa) that summarizes the history line of COVID-19 in Iowa. This is a great resource! We can integrate more valuable information into our analysis from there. This info will be in the `iowa_first_covid_events` data set.
 
 ```{r}
 #| label: covid19_events_data_set
@@ -667,7 +674,7 @@ iowa_first_covid_events <- tibble(Event  = events_covid,
 
 ```
 
-We will modify our data set to consider the inventory diversity effect and control for this confounder. First, let's get a vector with all the items available before `2020-04-02`.
+We will modify our data set to consider the **inventory diversity effect** and **control** for this **confounder**. First, let's get a vector with all the items available before the pandemic start.
 
 ```{r}
 #| label: get_prepandemic_items
@@ -680,7 +687,7 @@ items_prepandemic <- iowa_liquor_data %>%
   unique()
 ```
 
-Then, let's filter our data to exclude the receipts that include any post-pandemic item; after that, we can do a monthly aggregation of our time series.
+Then, let's filter our data to exclude the receipts that include any during-, and post-pandemic item; after that, we can do a monthly aggregation of our time series.
 
 ```{r}
 #| label: filter_exclude_pandemic_new_items
@@ -701,21 +708,20 @@ sales_in_covid_times <- iowa_liquor_data %>%
   mutate(year = year(month))
 ```
 
-To control for this confounding factor, we will keep the variable `n_different_products` constant by including only items that did exist before the pandemic started (i.e., `r pandemic_start_date`). By doing so, we can ensure that any observed changes in the outcome variable are due to the intervention being studied and not the confounding variable. If you want to learn more about causal inference, I recommend checking out Molak [-@Molak2023] for a practical introduction, and Pearl and Mackenzie [-@PearlMackenzie2018] for a theoretical grasp.
+To control for this confounding factor, we will keep the variable `n_different_products` constant by including only items that did exist before the pandemic started (i.e., `r pandemic_start_date`). By doing so, we can ensure that any observed changes in the outcome variable are due to the intervention being under study, and not the confounding variable. If you want to learn more about causal inference, I recommend checking out Molak [-@Molak2023] for a practical introduction, and Pearl and Mackenzie [-@PearlMackenzie2018] for a theoretical grasp.
 
 Let's have a look at this data.
 
 ```{r}
 #| label: sales_in_covid_times_first_plot
 #| classes: dark-light
-#| column: screen-inset-shaded
 
 ggplot(sales_in_covid_times, aes(x=month, y=bottles_sale_per_capita)) +
   geom_line(color = '#8d8d8d') + 
   labs(x = "Date", y = "Bottles sale per capita")
 ```
 
-Let's get a little more detailed with our chart and decompose as we did before
+Let's get a little more detailed with our chart and decompose it as we did before.
 
 ```{r}
 #| label: sales_in_covid_times_decmomp_plot
@@ -728,7 +734,7 @@ sales_in_covid_times %>%
   ggplotly()
 ```
 
-Let's check the peak of sales after the adjustment
+When was the peak of sales after the adjustment?
 
 ```{r}
 #| label: check_month_with_more_sales
@@ -741,7 +747,7 @@ paged_table(month_with_more_sales)
 
 Now you must be thinking "Hey, as new products appear, also old ones disappear. The same year you restricted the emergence of new products, we observe a decrease in sales." And you're right, let's put the restriction in new products much before the pandemic and then render a new trend chart.
 
-We create a vector with only the items available several years before pandemic. Set the new product filter in 2016 should be anough.
+We create a vector with only the items available several years before pandemic. Seting the new product filter in 2016 should be anough.
 
 ```{r}
 #| label: items_restriction_before_pandemic
@@ -763,7 +769,7 @@ sales_precovid_times <- iowa_liquor_data %>%
   group_by(month = yearmonth(date)) %>%   
   mutate(year = year(month)) %>% 
   left_join(iowa_population, by = c("year"="Year")) %>% # Integrate with Iowa population data
-  mutate(population_millions = Population/1e6, # A variable for the population in Millions
+  mutate(population_millions = Population/1e6,          # A variable for the population in Millions
          bottles_per_million_inhabitants = sale_bottles/population_millions,
          bottles_per_capita = sale_bottles/Population) %>% # Sales of bottles per million inhabitants
   summarise(n_different_products     = n_distinct(itemno),
@@ -783,7 +789,7 @@ ggplot(sales_precovid_times, aes(x=month, y=bottles_sale_per_capita)) +
   labs(x = "Date", y = "Bottles sale per capita")
 ```
 
-Let's get a little more detailed with our chart and decompose as we did before
+Let's get a little more detailed with our chart and decompose it.
 
 ```{r}
 #| label: sales_in_restriction_2016_decomp_plot
@@ -798,7 +804,7 @@ sales_precovid_times %>%
 
 Please notice that the trend is almost the same.
 
-Let's see which now the peak of alcohol purchases.
+Let's see where is now the peak of alcohol purchases.
 
 ```{r}
 #| label: check_month_with_more_sales_2016_restrict
@@ -809,7 +815,7 @@ day_with_more_sales_2016_restriction <- sales_precovid_times %>%
 paged_table(day_with_more_sales_2016_restriction) 
 ```
 
-And there you have it! It is still Dec 2020. So we can rule out the hypothesis of the decrease in sales due to the exclusion of new products while the old ones were drop into the oblivion. If a product is good and sells well, it should remain into the market
+And there you have it! It is still Dec 2020. So we have more evidence to rule out the hypothesis of the decrease in sales due to the exclusion of new products while the old ones were drop into the oblivion. If a product is good and sells well, it should remain into the market
 
 ### Now back to our `sales_in_covid_times` data set
 
@@ -833,7 +839,7 @@ covid_start_end_dates <- iowa_first_covid_events %>%
   mutate(event_summary=if_else(Date == min(Date), 'Start', 'End'))
 ```
 
-In this table we can appreciate the pandemic started at the beginning of 2020, and it ended (by decree) at the start of 2023. If we visualize this we have
+In this table we can appreciate the pandemic started at the beginning of 2020, and it ended (by decree) at the start of 2023. If we visualize this we have:
 
 ```{r}
 #| label: sales_in_covid_times_decomp_plot_w_range
@@ -848,33 +854,33 @@ sales_in_covid_times %>%
   theme(legend.position = "bottom") 
 ```
 
-Remember that data set that considered the sales of only items that existed previous to the pandemic? (sales_in_covid_times) We will use it here to test in a formal manner if there was a difference in alcohol sales during the pandemic. First we will prepare each treatment data: pre-pandemic (2017, 2018, and 2019) and during-pandemic (2020, 2021, and 2022). Three years are selected.
+Remember that data set that considered the sales of only items that existed previous to the pandemic (`sales_in_covid_times`)? We will use it here to test in a formal manner if there was a difference in alcohol sales during the pandemic. First we will prepare each treatment data: pre-pandemic (2017, 2018, and 2019) and during-pandemic (2020, 2021, and 2022). Three years are selected.
 
 ```{r}
 #| label: data_for_best_test
 
 pre_covid_data <- sales_in_covid_times %>% 
-  filter(year %in% c(2017, 2018, 2019)) # Now we have 36 months of aggregated data to compare
+  filter(year %in% c(2017, 2018, 2019)) # 36 months of aggregated data to compare
 
 during_covid_data <- sales_in_covid_times %>% 
-  filter(year %in% c(2020, 2021, 2022)) # Now we have 36 months of aggregated data to compare
+  filter(year %in% c(2020, 2021, 2022)) # 36 months of aggregated data to compare
 ```
 
-In order to investigate whether there was a change in alcohol sales as a result of the COVID-19 pandemic, we will be using a statistical technique developed by psychologist John K. Kruschke [-@Kruschke2013], who is known for the book of the puppies (Doing Bayesian Data Analysis). This technique is called "Bayesian Estimation Supersedes the t-Test," BEST for short. The mean idea here is to apply inference to the problem of comparing means of two groups.
+In order to investigate whether there was a change in alcohol sales as a result of the COVID-19 pandemic, we will be using a statistical technique developed by the psychologist John K. Kruschke [-@Kruschke2013], who is known for the book of the puppies (Doing Bayesian Data Analysis). This technique is called "Bayesian Estimation Supersedes the t-Test," BEST for short. The mean idea here is to apply inference to the problem of comparing means of two groups.
 
 ![Kruschke's book cover](images/kruschke_puppies.png)
 
 But why should we complicate ourselves with such esoteric approaches? (it is pretty popular, though..).
 
-*   First, quantifying uncertainty is crucial when we conduct statistical inference. We want to be sure whether the observed effects are likely to be due to chance or if they represent actual differences due to an event, in this case, a pandemic. This way, we can measure the amount of "doubt" in our decisions.
+-   First, quantifying uncertainty is crucial when we conduct statistical inference. We want to be sure whether the observed effects are likely to be due to chance or if they represent actual differences due to an event, in this case, a pandemic. This way, we can measure the amount of "doubt" in our decisions.
 
-*   Second, this approach is quite powerful since it allow us to speak in terms of the **magnitude of the effect**, which gives us an idea of how serious the situation is. It also has a beautiful interpretation that facilitates much of the communication of results to the stakeholders.
+-   Second, this approach is quite powerful since it allow us to speak in terms of the **magnitude of the effect**, which gives us an idea of how serious the situation is. It also has a beautiful interpretation that facilitates much of the communication of results to the stakeholders.
 
-*   Third, the decision threshold for determining whether there is a difference between the treatment and control groups (such as during a pandemic vs. non-pandemic scenario) is straightforward to communicate and interpret. It's also considered less arbitrary since it requires knowledge of the underlying phenomena.
+-   Third, the decision threshold for determining whether there is a difference between the treatment and control groups (such as during a pandemic vs. non-pandemic scenario) is straightforward to communicate and interpret. It's also considered less arbitrary since it requires knowledge of the underlying phenomena.
 
-For a comprehensive review on the subject, check Kruschke [-@KruschkeLiddell2017]. It is convenient for a data scientist to understand how this technique works, so it is worth taking a couple of hours of your time for this read.
+For a comprehensive review on the subject, check Kruschke [-@KruschkeLiddell2017]. It is convenient for a data scientist to understand how this kind of techniques work, so it is worth taking a couple of hours of your time for this read.
 
-For this test we will need to install the `BEST` library, but it was brought down from CRAN some time ago. No worries, you can install it with the following code.
+Here, we will need to install the `BEST` library, but it was brought down from CRAN some time ago. No worries, you can install it with the following code.
 
 ```{r}
 #| label: install_best
@@ -884,18 +890,18 @@ For this test we will need to install the `BEST` library, but it was brought dow
 # install.packages('https://cran.r-project.org/src/contrib/Archive/BEST/BEST_0.5.4.tar.gz')
 ```
 
-This method relies on MCMC to estimate the posterior distribution of the population parameter we are interested in, the monthly mean sales of liquor bottles. So, the first step will be to run the MCMC to get the posterior distributions; we will do this with the function `BESTout`.
-
+This method relies on MCMC to estimate the posterior distribution of the parameter we are interested in, the monthly mean sales of liquor bottles. So, the first step will be to run the MCMC to get the posterior distributions; we will do this with the function `BESTout`.
 
 ```{r}
 #| label: run_mcmc
+#| output: false
 
 BESTout <- BESTmcmc(during_covid_data$bottles_sale_per_million,
                     pre_covid_data$bottles_sale_per_million, 
                     parallel = FALSE)
 ```
 
-We will do our inference with visual aids, but you can explore the object `BESTout` if you are curious since it contains lots of information. In the following chunk, we plot our posteriors. Kruschke's library includes a lot of valuable functions. To get the best charts, we will use `plotPost`.
+We will do our inference with visual aid, but you can explore the object `BESTout` if you are curious, it contains lots of information. In the following chunk, we plot our posteriors. Kruschke's library includes a lot of valuable functions. To get some useful charts, we will use `plotPost`.
 
 ```{r}
 #| label: visualize_posteriors
@@ -908,7 +914,7 @@ ROPEColor = "darkred"
 xlim <- range(BESTout$mu1, BESTout$mu2)
 
 # First plot
-par(mfrow=c(2,1))
+par(mfrow=c(2,1)) # To set both estimated dsitributions in the same frame
 plotPost(BESTout$mu1, 
          xlim = xlim, 
          cex.lab = 1.75, 
@@ -932,7 +938,7 @@ plotPost(BESTout$mu2,
          ROPEColor = ROPEColor)
 ```
 
-Here, we can appreciate the posterior distribution for our parameters, the mean sales during the pandemic, and the mean sales in a pre-pandemic time. The black bars at the base of the distributions are the highest density intervals (HDI), also called the credible intervals, which are the distribution regions with the most credible values for the parameter. First, we can notice that the estimated distribution for the pandemic parameter is further to the right. At the same time, the pre-pandemic param fell behind, hinting that the average sales during the pandemic were higher. Second, the HDIs do not overlap.
+Here, we can appreciate the estimated posterior distribution for our parameters, the mean sales during the pandemic, and the mean sales in a pre-pandemic time. The black bars at the base of the distributions are the highest density intervals (HDI), also called the credible intervals, which are the distribution regions with the most credible values for the estimated measurement. First, we can notice that the estimated distribution for the pandemic parameter is further to the right. At the same time, the pre-pandemic param fell behind, hinting that the average sales during the pandemic were higher. Second, the HDIs do not overlap.
 
 Now we visualize the magnitude of the effect. This is the difference between both distributions.
 
@@ -953,8 +959,9 @@ plotPost(BESTout$mu1 - BESTout$mu2,
          ROPEColor = ROPEColor)
 ```
 
-The mean difference between `r mean(BESTout$mu1 - BESTout$mu2)`
-Now, let's look how many times the alcohol consumption increased. If you want to learn more about ROPE interpretation and this kind of inference, please revisit [-@Kruschke2018]
+The mean difference between the estimated parameters distribution is `r round(mean(BESTout$mu1 - BESTout$mu2)/1000, 1)` sold bottles. Also, note we set 'compVal' as 5% of pre-pandemic sales. This comparison value is also called the region of practical equivalence (ROPE), a value of difference good enough for practical purposes. We have observed that the ROPE we set up (which denotes an increase of at least 5% in the number of bottles sold) does not reach the HDI range. The ROPE left behind the HDI indicates that alcohol sales have, in fact, went up by more than 5% during the pandemic. It is worth noting that the ROPE serves as a boundary around the null value (which is zero, meaning no observable effect).
+
+Now, let's look how many times (in average) the alcohol consumption increased. If you want to learn more about ROPE interpretation and this kind of inference, please revisit [-@kruschke2018].
 
 ```{r}
 #| label: visualize_proportional_effect
@@ -970,6 +977,16 @@ plotPost(BESTout$mu1 / BESTout$mu2,
          comparisonColor = comparisonColor, 
          ROPEColor = ROPEColor)
 ```
+
+On average, the sales increased by 14%, but if we want to be conservative, we can use the low margin of the HDI and say that during the pandemic, alcohol sales increased by **at least** 8%.
+
+# Congratulations!
+
+![](images/congratulations.png)
+
+You made it to the end of this tutorial! Thank you for investing your time in reading it. I sincerely hope that you have found it both entertaining and helpful.
+
+If you have any feedback, please don't hesitate to share it with me. I'm always looking for ways to improve and provide better assistance.
 
 # Acknowledgements
 
