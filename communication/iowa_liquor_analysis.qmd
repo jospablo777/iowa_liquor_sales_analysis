@@ -1,5 +1,8 @@
 ---
 title: "Iowa Liquor Sales: 2.0+1.0 You are (Not) in a Pandemic"
+include-in-header:
+  - text: |
+      <link rel = "shortcut icon" href = "images/icon.png" />
 author: 
   name: "Jose P. Barrantes"
   url: "https://www.linkedin.com/in/jose-barrantes/"
@@ -134,7 +137,7 @@ iowa_population <- read_csv('../data/iowa_population.csv') %>%
 
 In the past snippet, we added an extra variable, `pop_100k`, the population of 100k inhabitants. Later, we will also get more data.
 
-# Exploratory Data Analysis (EDA)
+## Exploratory Data Analysis (EDA)
 
 Here, we will start by getting to know the data set briefly. Let's begin with finding the time span we have to play with.
 
@@ -980,7 +983,13 @@ plotPost(BESTout$mu1 / BESTout$mu2,
 
 On average, the sales increased by 14%, but if we want to be conservative, we can use the low margin of the HDI and say that during the pandemic, alcohol sales increased by **at least** 8%.
 
-# Congratulations!
+## Final remarks
+
+Wow, that was an extensive tutorial. I hope you have enjoyed it :)
+
+Here, we explored REAL data made publicly available by the Iowa Government. We did lots of data wrangling, time series analysis, and visualizations, then concluded with some statistical inference. Now, we know a little more about alcohol consumption dynamics and how to generate new information in the field of alcohol retail sales.
+
+## Congratulations!
 
 ![](images/congratulations.png)
 
