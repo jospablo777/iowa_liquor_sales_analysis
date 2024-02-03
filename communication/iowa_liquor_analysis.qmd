@@ -31,6 +31,8 @@ Here we will explore the the data set "Iowa Liquor Sales" which is freely availa
 
 You can take this as a history I tell with the data at hand, but also as a tutorial of some things that can be done using time series data. So please do not hesitate in using the code below in your professional/personal projects. Also, if you have any feedback I will be happy to receive it :)
 
+Feel free to check the source code for this analysis in the [GitHub repo](https://github.com/jospablo777/iowa_liquor_sales_analysis/tree/main). Probably the most useful for you will be the [Quarto file](https://github.com/jospablo777/iowa_liquor_sales_analysis/blob/main/communication/iowa_liquor_analysis.qmd).
+
 ## About the data set
 
 The [data set](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data) we will be using contains information about the purchase of spirits made by grocery, liquor, and convenience stores, including supermarkets. This data is provided by the Iowa Open Data Platform and is constantly updated. It includes item descriptions and geospatial data, and is licensed under Creative Commons, which means that its use is less restrictive than other types of data. However, it's important to note that the data only includes purchases of spirits, and does not include beer, wine, or moonshine purchases. Therefore, we do not have a complete picture of alcohol consumption.
