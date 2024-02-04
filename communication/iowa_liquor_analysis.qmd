@@ -1011,4 +1011,4 @@ This small tutorial wouldn't be possible without Little Mai, my home office mana
 
 ![Little Mai](images/mai_stats.jpg)
 
-And, of course, [Eric Vargas](https://www.linkedin.com/in/ericvargas-ea/) reviewed this material exhaustively before being published. Google, hire this man; you don't know what you're missing! ;)
+And, of course, [Eric Vargas](https://www.linkedin.com/in/ericvargas-ea/), who reviewed this material exhaustively before being published. Google, hire this man; you don't know what you're missing! ;)
