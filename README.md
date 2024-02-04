@@ -3,10 +3,70 @@
 
 # Iowa Liquor Sales data analysis
 
-## Overview
+## About this project
 
-The final report for this analysis can be found in [this web
-page](https://jospablo777.github.io/iowa_liquor_sales_analysis/iowa_liquor_analysis.html).
-Here we explore the data set “Iowa Liquor Sales” made public by the Iowa
-Government. You can check the data set
-[here](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data).
+Here we will explore the the data set “Iowa Liquor Sales” which is
+freely available. The scope of this analysis is intended as a first
+exploration of the data resources of the Iowa Open Data Platform. First,
+we will conduct a basic data exploration process, and then we will use
+statistical inferences to answer two specific questions:
+
+1.  Can the diversity in our inventory increase the sales of our store?
+
+2.  Did the pandemic increased the alcoholic intake of alcohol in the
+    population?
+
+You can take this as a history I tell with the data at hand, but also as
+a tutorial of some things that can be done using time series data. So
+please do not hesitate in using the code below in your
+professional/personal projects. Also, if you have any feedback I will be
+happy to receive it :)
+
+Feel free to check the source code for this analysis in this GitHub
+repo. Probably the Quarto
+[file](https://github.com/jospablo777/iowa_liquor_sales_analysis/blob/main/communication/iowa_liquor_analysis.qmd)
+will be the most informative for you. But please explore the rest of the
+repository.
+
+[Here](https://jospablo777.github.io/iowa_liquor_sales_analysis/iowa_liquor_analysis.html)
+is the website with the rendered report.
+
+## About the data set
+
+The [data
+set](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data)
+we will be using contains information about the purchase of spirits made
+by grocery, liquor, and convenience stores, including supermarkets. This
+data is provided by the Iowa Open Data Platform and is constantly
+updated. It includes item descriptions and geospatial data, and is
+licensed under Creative Commons, which means that its use is less
+restrictive than other types of data. However, it’s important to note
+that the data only includes purchases of spirits, and does not include
+beer, wine, or moonshine purchases. Therefore, we do not have a complete
+picture of alcohol consumption.
+
+If you plan on running an analysis using this data set, I recommend
+using a machine with at least 32 GB of RAM, as the data is around 12 GB
+in size. No GPU will be required for this task.
+
+## About the tools used
+
+The chosen analysis tool was the R language for statistical computing
+alongside the Tidyverse ecosystem. Because it’s free, open-source, and
+one of the most powerful tools available for this purpose. Also, we can
+guarantee the reproducibility of the analysis/solution with this
+methodology.
+
+This web page was generated with Quarto. Here, we have the code and a
+narrative backed by our results, all in the same document. Great for
+auditing processes! And also for the result presentation.
+
+For instance, if I made an error during the analysis, you can easily
+keep track of what happened and why. Similarly, if we achieved excellent
+results, the same code can be reused in the future.
+
+## Feedback or comments?
+
+Please feel free to contact me via
+[LinkedIn](https://www.linkedin.com/in/jose-barrantes/) if you have any
+feedback.
