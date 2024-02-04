@@ -39,6 +39,14 @@ The [data set](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-q
 
 If you plan on running an analysis using this data set, I recommend using a machine with at least 32 GB of RAM, as the data is around 12 GB in size. No GPU will be required for this task.
 
+## About the tools used
+
+The chosen analysis tool was the R language for statistical computing alongside the Tidyverse ecosystem. Because it’s free, open-source, and one of the most powerful tools available for this purpose. Also, we can guarantee the reproducibility of the analysis/solution with this methodology.
+
+This web page was generated with Quarto. Here, we have the code and a narrative backed by our results, all in the same document. Great for auditing processes! And also for the result presentation.
+
+For instance, if I made an error during the analysis, you can easily keep track of what happened and why. Similarly, if we achieved excellent results, the same code can be reused in the future.
+
 ## Libraries
 
 We will begin by setting up our R environment.

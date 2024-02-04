@@ -89,5 +89,12 @@
     "title": "Iowa Liquor Sales: 2.0+1.0 You are (Not) in a Pandemic",
     "section": "Footnotes",
     "text": "Footnotes\n\n\nI highly recommend following Jason’s material if you’re pivoting into data science.↩︎"
+  },
+  {
+    "objectID": "iowa_liquor_analysis.html#about-the-tools-used",
+    "href": "iowa_liquor_analysis.html#about-the-tools-used",
+    "title": "Iowa Liquor Sales: 2.0+1.0 You are (Not) in a Pandemic",
+    "section": "About the tools used",
+    "text": "About the tools used\nThe chosen analysis tool was the R language for statistical computing alongside the Tidyverse ecosystem. Because it’s free, open-source, and one of the most powerful tools available for this purpose. Also, we can guarantee the reproducibility of the analysis/solution with this methodology.\nThis web page was generated with Quarto. Here, we have the code and a narrative backed by our results, all in the same document. Great for auditing processes! And also for the result presentation.\nFor instance, if I made an error during the analysis, you can easily keep track of what happened and why. Similarly, if we achieved excellent results, the same code can be reused in the future."
   }
 ]
