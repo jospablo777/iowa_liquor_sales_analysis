@@ -5,10 +5,10 @@
 
 ## About this project
 
-Here we will explore the the data set “Iowa Liquor Sales” which is
-freely available. The scope of this analysis is intended as a first
-exploration of the data resources of the Iowa Open Data Platform. First,
-we will conduct a basic data exploration process, and then we will use
+Here we will explore the data set “Iowa Liquor Sales,” which is freely
+available. The scope of this analysis is intended as a first exploration
+of the data resources of the Iowa Open Data Platform. First, we will
+conduct a basic data exploration process, and then we will use
 statistical inferences to answer two specific questions:
 
 1.  Can the diversity in our inventory increase the sales of our store?
