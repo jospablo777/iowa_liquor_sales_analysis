@@ -1010,3 +1010,5 @@ If you have any feedback, please don't hesitate to share it with me. I'm always 
 This small tutorial wouldn't be possible without Little Mai, my home office manager and data science bestie! She's always got my back when my gradients won't converge 💕
 
 ![Little Mai](images/mai_stats.jpg)
+
+And, of course, [Eric Vargas](https://www.linkedin.com/in/ericvargas-ea/) reviewed this material exhaustively before being published. Google, hire this man; you don't know what you're missing! ;)
