@@ -23,7 +23,7 @@ theme:
 
 ## About this project
 
-Here we will explore the the data set "Iowa Liquor Sales" which is freely available. The scope of this analysis is intended [to make an Evangelion reference]{style="text-decoration: line-through;"} as first exploration of the data resources of the Iowa Open Data Platform. First, we will conduct a basic data exploration process, and then we will use statistical inferences to answer two specific questions:
+Here we will explore the data set "Iowa Liquor Sales," which is freely available. The scope of this analysis is intended [to make an Evangelion reference]{style="text-decoration: line-through;"} as first exploration of the data resources of the Iowa Open Data Platform. First, we will conduct a basic data exploration process, and then we will use statistical inferences to answer two specific questions:
 
 1.  Can the diversity in our inventory increase the sales of our store?
 
@@ -329,7 +329,8 @@ anomalies_plot <- ggplot(iforest_results, aes(x=day, y=n_bottles)) +
 anomalies_plot
 ```
 
-It seems that most of the anomalies are those near zero on weekends (Friday, Saturday, and Sunday); this is because more businesses are closed on weekends; there are no purchases there, all good. We can contrast this in the following chart.
+It seems that most of the anomalies are those near zero on weekends (Friday, Saturday, and Sunday); this is because more businesses are closed on weekends; there are no purchases there, all good. We can contrast the above figure with the following chart.
+
 
 ```{r}
 #| label: iforest_results_plot_comparison
@@ -343,9 +344,7 @@ consumption_time_series_is_weekend_plot <-
   labs(x = 'Date', y = 'Sold bottles', color = "Is weekend?") +
   scale_x_date(date_breaks = "2 year",date_labels = "%Y")
 
-
-ggpubr::ggarrange(anomalies_plot, consumption_time_series_is_weekend_plot,
-                  nrow = 2)
+consumption_time_series_is_weekend_plot
 ```
 
 Most of the lower anomalies are due to weekends. 
