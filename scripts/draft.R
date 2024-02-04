@@ -2,7 +2,7 @@ library(tidyverse)
 library(feather)
 library(plotly)
 library(reticulate)
-source('utils/get_data.R')
+# source('utils/get_data.R')
 source('utils/data_processing.R')
 
 # Time series libraries

@@ -37,7 +37,7 @@ Feel free to check the source code for this analysis in the [GitHub repo](https:
 
 The [data set](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy/about_data) we will be using contains information about the purchase of spirits made by grocery, liquor, and convenience stores, including supermarkets. This data is provided by the Iowa Open Data Platform and is constantly updated. It includes item descriptions and geospatial data, and is licensed under Creative Commons, which means that its use is less restrictive than other types of data. However, it's important to note that the data only includes purchases of spirits, and does not include beer, wine, or moonshine purchases. Therefore, we do not have a complete picture of alcohol consumption.
 
-If you plan on running an analysis using this dataset, I recommend using a machine with at least 32 GB of RAM, as the data is around 12 GB in size. No GPU will be required for this task.
+If you plan on running an analysis using this data set, I recommend using a machine with at least 32 GB of RAM, as the data is around 12 GB in size. No GPU will be required for this task.
 
 ## Libraries
 
@@ -83,7 +83,7 @@ library(BEST)
 
 ## Get the data, and some performance considerations
 
-I've written an R package to facilitate the download from the Iowa Open Data Portal; Please check [iodDownloader GitHub page](https://github.com/jospablo777/iodDownloader) for more details on the data pull. The package can be installed with:
+I've written an R package to facilitate the download from the Iowa Open Data Portal; Please check [iodDownloader](https://github.com/jospablo777/iodDownloader) GitHub page for more details on the data pull. The package can be installed with:
 
 ```{r}
 #| label: install_iodDownloader
@@ -167,34 +167,10 @@ n_distinct(iowa_liquor_data$invoice_line_no) == nrow(iowa_liquor_data)
 
 An equal number of rows and distinct invoice IDs mean that every invoice differs. So, no duplicates were found :)
 
-How many locations are missing? This is important since we will do some geospatial analysis later tutorials.
-
-```{r}
-#| label: n_missing_locations
-
-missing_location <- sum(is.na(iowa_liquor_data$store_location))
-format(missing_location, big.mark=",")
-```
-
-The `county_number` and `store_location` are the variables with the most missing values. Around `r round(missing_location/1e6, 2)` M of invoices do not have location. Later we will deal with this issue, in the next analysis.
-
-```{r}
-#| label: n_no_location_stores
-
-n_no_location_stores <- iowa_liquor_data %>% 
-  filter(is.na(store_location)) %>% 
-  dplyr::pull(store) %>% 
-  n_distinct()
-
-n_no_location_stores
-```
-
-But the missing data is only from `r n_no_location_stores` stores.
-
 Let's check how many missing values we have per column.
 
 ```{r}
-#| label: missing_values__per_col
+#| label: missing_values_per_col
 
 missing_per_column <- colSums(is.na(iowa_liquor_data)) %>% 
   as.list() %>% 
@@ -210,7 +186,9 @@ We have three missing item IDs, but the sales fields have no missing values, whi
 
 ## Exploring time series structure
 
-Prepare the data first.
+Time series data is quite special; "They are a different kind of beast," as one of my former bosses used to say; here, the order in which the points are displayed matters since there is a lot of information encoded in the order in which every event happened.
+
+Let's start this part of the exploration with the data preparation.
 
 ```{r}
 #| label: first_ts_dataset
@@ -238,7 +216,7 @@ First impression of our daily data.
 #| column: screen-inset-shaded
 
 consumption_time_series_day_plot <- 
-  ggplot(consumption_day_summary, aes(x = as.Date(day), y = n_bottles)) + # , color='trick_line_col'
+  ggplot(consumption_day_summary, aes(x = as.Date(day), y = n_bottles)) + 
   geom_line(color = "#8d8d8d") + 
   theme(legend.position = "none") +
   labs(x = 'Date', y = 'Sold bottles')
@@ -251,7 +229,7 @@ It seems that there are a lot of purchases near to zero. Could all the liquor st
 ```{r}
 #| classes: dark-light
 #| column: screen-inset-shaded
-#| 
+
 consumption_time_series_day_plot <- 
   ggplot(consumption_day_summary, aes(x = as.Date(day), y = n_bottles)) + 
   geom_line(color = "#8d8d8d") + 
@@ -263,7 +241,7 @@ consumption_time_series_day_plot
 
 Fridays, Saturdays, and Sundays are the days with fewer purchases. Indeed, the stores do not put orders on weekends (most of the times).
 
-Now, let's explore the calendar effect in our time series data. Here, we will gain a general notion of how the human cycles surrounding the calendar (such as weekends and holidays) affect liquor sales. This will be very easy with the library `timetk` by Matt Dancho. The function `plot_seasonal_diagnostics`, creates the relevant plots for this analysis.
+Now, let's explore the calendar effect in our time series data. Here, we will gain a general notion of how the human cycles surrounding the calendar (such as weekends and holidays) affect liquor sales. This will be very easy with the library `timetk` by Matt Dancho. The function `plot_seasonal_diagnostics`, creates the relevant plots for this analysis. Please interact with the charts below by hovering over the different elements.
 
 ```{r, out.height=700}
 #| label: calendar_effect
@@ -276,7 +254,7 @@ consumption_day_summary %>%
   timetk::plot_seasonal_diagnostics(day_, n_bottles)
 ```
 
-Please interact with these charts by hovering over the elements. First, we can notice that the stores avoid making purchases on weekends. Then we see that October and December are the months with the most purchases in the year, the same for the last quarter of the year. And finally, it seems that 2013 and 2020 were good years.
+Initially, we can observe that the stores tend to avoid making purchases on weekends. Moving on to the month-wise analysis, we can see that October and December have the highest number of assets compared to other months, which is consistent with the trend observed in the last quarter of the year. Finally, looking at the year-wise data, it appears that 2013 and 2020 were favorable years for selling alcoholic drinks.
 
 ## Anomaly detection in time series
 
@@ -337,12 +315,34 @@ anomalies_plot <- ggplot(iforest_results, aes(x=day, y=n_bottles)) +
   geom_line(color="#8d8d8d") + 
   geom_point(aes(color=Anomaly)) + 
   scale_color_manual(values=c("#58bbc3", "#e78170")) +
-  labs(x='Date', y = 'Sold bottles', color="Anomaly") 
+  labs(x='Date', y = 'Sold bottles', color="Anomaly") +
+  scale_x_date(date_breaks = "2 year",date_labels = "%Y")
 
 anomalies_plot
 ```
 
-It seems that most of the anomalies are those near zero on weekends (Friday, Saturday, and Sunday); this is because more businesses are closed on weekends; there are no purchases there, all good. But wait a second what are those in the 4th and the 11th of October 2013, those look suspicious. In fact, let's check all the anomalies over the percentile 50%. We are not interested in the lower anomalies because we know that some purchases are on weekends, but most establishments do not place orders on weekends.
+It seems that most of the anomalies are those near zero on weekends (Friday, Saturday, and Sunday); this is because more businesses are closed on weekends; there are no purchases there, all good. We can contrast this in the following chart.
+
+```{r}
+#| label: iforest_results_plot_comparison
+#| classes: dark-light
+
+consumption_time_series_is_weekend_plot <- 
+  ggplot(consumption_day_summary, aes(x = as.Date(day), y = n_bottles)) + 
+  geom_line(color = "#8d8d8d") + 
+  geom_point(aes(color = as.factor(weekend))) +
+  scale_color_manual(values=c("#58bbc3", "#e78170")) +
+  labs(x = 'Date', y = 'Sold bottles', color = "Is weekend?") +
+  scale_x_date(date_breaks = "2 year",date_labels = "%Y")
+
+
+ggpubr::ggarrange(anomalies_plot, consumption_time_series_is_weekend_plot,
+                  nrow = 2)
+```
+
+Most of the lower anomalies are due to weekends. 
+
+But wait a second, what are those in the 4th and the 11th of October 2013? Those look suspicious. In fact, let's check all the anomalies above the percentile 50%. We are not interested in the lower anomalies because we know that most establishments do not place orders on weekends.
 
 ```{r}
 #| label: upper_anomalies_data
@@ -371,7 +371,7 @@ daynumber_by_month_holidays <- holidays %>%
 
 ```
 
-With the above data, we will plot the top outliers alongside the booziest days in the United States, based on information from alcohol.com.
+With the above data, we will plot the top outliers alongside the booziest days in the United States, based on information from [alcohol.com](https://alcohol.org/guides/booziest-holidays/).
 
 ```{r}
 #| label: anomalies_first_scatter_plot
@@ -410,7 +410,7 @@ To extract more insights from our time series data, it's useful to break it down
 
 STL is a great choice as it can detect various types of seasonality and can be tailored to specific needs. Moreover, it's a reliable method that generally delivers accurate results. You can find more information about STL in the book ["Forecasting: Principles and Practice"](https://otexts.com/fpp3/) by Hyndman and Athanasopoulos [-@Hyndman2021].
 
-```{r, out.height=600}
+```{r, out.height=500}
 #| label: first_ts_composition_plot
 #| classes: dark-light
 #| column: screen-inset-shaded
@@ -428,8 +428,8 @@ consumption_day_summary %>%
 We are presented with four charts in this visualization; the first one is our time series, which is followed by its components:
 
 -   The trend in liquor sales over time
--   The seasonal pattern through the years
--   The seasonal pattern through the weeks
+-   The seasonal pattern throughout the years
+-   The seasonal pattern throughout the weeks
 -   The remainder, which is the variability that cannot be explained. Also known as noise.
 
 The above chart has a lot of information. Let's aggregate the info in months to analyze the chart with less granularity.
@@ -501,7 +501,7 @@ We noticed a sales increase in bottles over time. Is the rise merely due to popu
 
 Our next step is to investigate whether the number of diverse products in the market is a reliable indicator of sales. It's important to note that diversity encompasses not only different flavors, but also various sizes and presentations. For instance, a smaller bottle of the same rum, or a special edition of your favorite tequila brand with collectible shot glasses.
 
-Now that we know that the population of Iowas has been increasing and that it could be a potential **confounder** when we try to estimate the effect of the diversity of products, we should consider it. To begin with, we must adjust the sales figures based on the population data (i.e., normalize by the current population in a given time).
+Now that we know that the population of Iowa has been increasing and that it could be a potential **confounder** when we try to estimate the effect of the diversity of products, we should consider it. To begin with, we must adjust the sales figures based on the population data (i.e., normalize by the current population in a given time).
 
 ```{r}
 #| label: sale_by_diversity_dataset
@@ -750,9 +750,11 @@ month_with_more_sales <- sales_in_covid_times %>%
 paged_table(month_with_more_sales) 
 ```
 
-Now you must be thinking "Hey, as new products appear, also old ones disappear. The same year you restricted the emergence of new products, we observe a decrease in sales." And you're right, let's put the restriction in new products much before the pandemic and then render a new trend chart.
+Now you must be thinking "Hey, as new products appear, also old ones disappear. The same year you restricted the emergence of new products, we observe a decrease in sales." 
 
-We create a vector with only the items available several years before pandemic. Seting the new product filter in 2016 should be anough.
+![](images/retriever_wagging.jpg)
+
+And you're right! Let's put the restriction on new products much before the pandemic and then render a new trend chart. We create a vector with only the items available several years before the pandemic. Setting the new product filter in 2016 should be enough.
 
 ```{r}
 #| label: items_restriction_before_pandemic
@@ -782,7 +784,7 @@ sales_precovid_times <- iowa_liquor_data %>%
             bottles_sale_per_capita  = sum(bottles_per_capita)) 
 ```
 
-Plot our time series
+Plot our time series to have a general sense of the change. The trend still seems to be there.
 
 ```{r}
 #| label: sales_in_restriction_2016_plot
@@ -890,7 +892,7 @@ Here, we will need to install the `BEST` library, but it was brought down from C
 ```{r}
 #| label: install_best
 
-# Please uncoment below lines if you want to install it
+# Please uncomment below lines if you want to install it
 # install.packages('HDInterval') # Your system may complain during BEST install if you don't have this dependency
 # install.packages('https://cran.r-project.org/src/contrib/Archive/BEST/BEST_0.5.4.tar.gz')
 ```
@@ -943,7 +945,7 @@ plotPost(BESTout$mu2,
          ROPEColor = ROPEColor)
 ```
 
-Here, we can appreciate the estimated posterior distribution for our parameters, the mean sales during the pandemic, and the mean sales in a pre-pandemic time. The black bars at the base of the distributions are the highest density intervals (HDI), also called the credible intervals, which are the distribution regions with the most credible values for the estimated measurement. First, we can notice that the estimated distribution for the pandemic parameter is further to the right. At the same time, the pre-pandemic param fell behind, hinting that the average sales during the pandemic were higher. Second, the HDIs do not overlap.
+Here, we can appreciate the estimated posterior distribution for our parameters, the mean sales during the pandemic, and the mean sales in a pre-pandemic time. The black bars at the base of the distributions are the highest density intervals (HDI), also called the credible intervals, which are the distribution regions with the most credible values for the estimated measurement. First, we can notice that the estimated distribution for the pandemic parameter is further to the right. At the same time, the pre-pandemic parameter fell behind, hinting that the average sales during the pandemic were higher. Second, the HDIs do not overlap.
 
 Now we visualize the magnitude of the effect. This is the difference between both distributions.
 
@@ -964,9 +966,9 @@ plotPost(BESTout$mu1 - BESTout$mu2,
          ROPEColor = ROPEColor)
 ```
 
-The mean difference between the estimated parameters distribution is `r round(mean(BESTout$mu1 - BESTout$mu2)/1000, 1)` sold bottles. Also, note we set 'compVal' as 5% of pre-pandemic sales. This comparison value is also called the region of practical equivalence (ROPE), a value of difference good enough for practical purposes. We have observed that the ROPE we set up (which denotes an increase of at least 5% in the number of bottles sold) does not reach the HDI range. The ROPE left behind the HDI indicates that alcohol sales have, in fact, went up by more than 5% during the pandemic. It is worth noting that the ROPE serves as a boundary around the null value (which is zero, meaning no observable effect).
+The mean difference between the estimated parameters distribution is `r round(mean(BESTout$mu1 - BESTout$mu2)/1000, 1)` sold bottles. Also, note we set `compVal` as 5% of pre-pandemic sales. This comparison value is also called the region of practical equivalence (ROPE), a value of difference good enough for practical purposes. We have observed that the ROPE we set up (which denotes an increase of at least 5% in the number of bottles sold) does not reach the HDI range. The HDI lower margin left out the ROPE, which indicates that alcohol sales have, in fact, gone up by more than 5% during the pandemic. It is worth noting that the ROPE serves as a boundary around the null value (which is zero, meaning no observable effect). If you want to learn more about ROPE interpretation and this kind of inference, please revisit [-@kruschke2018].
 
-Now, let's look how many times (in average) the alcohol consumption increased. If you want to learn more about ROPE interpretation and this kind of inference, please revisit [-@kruschke2018].
+Now, let's look how many times (in average) the alcohol consumption increased during the pandemic. 
 
 ```{r}
 #| label: visualize_proportional_effect
@@ -985,11 +987,15 @@ plotPost(BESTout$mu1 / BESTout$mu2,
 
 On average, the sales increased by 14%, but if we want to be conservative, we can use the low margin of the HDI and say that during the pandemic, alcohol sales increased by **at least** 8%.
 
+### Wrapping up our pandemic's effect question
+
+It seems that, during the pandemic, there was an actual increase in the alcohol intake by the population. This is no surprise since we saw several [reports](https://covid19.nih.gov/news-and-stories/risky-drinking-alcohol-use-epidemic-inside-covid-19-pandemic) about this. Still, estimating the pandemic effect using public data is certainly a good exercise for data scientists.
+
 ## Final remarks
 
 Wow, that was an extensive tutorial. I hope you have enjoyed it :)
 
-Here, we explored REAL data made publicly available by the Iowa Government. We did lots of data wrangling, time series analysis, and visualizations, then concluded with some statistical inference. Now, we know a little more about alcohol consumption dynamics and how to generate new information in the field of alcohol retail sales.
+Here, we explored REAL data, made publicly available by the Iowa Government. We did lots of data wrangling, time series analysis, and visualizations, and concluded with some statistical inference. Now, we know a little more about alcohol consumption dynamics and how to generate new information in the field of alcohol retail sales.
 
 ## Congratulations!
 
